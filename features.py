@@ -1,8 +1,10 @@
 import cv2 as cv
+import numpy as np
 
 # Detection
 
 orb = cv.ORB_create()
+
 
 def compute_orb_features(frames):
     for frame_id, frame in enumerate(frames):
@@ -15,7 +17,9 @@ def compute_orb_features(frames):
             "desc": desc,
         }
 
+
 # Matching
+
 
 def create_orb_flann_matcher():
     FLANN_INDEX_LSH = 6
@@ -27,7 +31,7 @@ def create_orb_flann_matcher():
     )
 
     cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
-    return KeyPointMatcher(cv_matcher.knnMatch)
+    return KeyPointMatcher(cv_matcher.knnMatch, draw_match)
 
 
 def create_stateful_orb_flann_matcher():
@@ -39,45 +43,35 @@ def create_stateful_orb_flann_matcher():
 
 
 class KeyPointMatcher:
-    def __init__(self, matcher):
+    def __init__(self, matcher, drawer):
         self.__matcher__ = matcher
+        self.__drawer__ = drawer
 
     def match_keypoints(self, frame1, frame2):
-        good_matches = []
         matches = self.__matcher__(
             frame1["desc"],
             frame2["desc"],
             k=2,
         )
-        for x, y in matches:
+        matches_1 = []
+        matches_2 = []
+        for m1, m2 in matches:
             thresh_value = 0.7
-            if x.distance < thresh_value * y.distance:
-                good_matches += [x]
-        return good_matches
+            if m1.distance < thresh_value * m2.distance:
+                matches_1 += [frame1["key_pts"][m1.queryIdx].pt]
+                matches_2 += [frame2["key_pts"][m1.trainIdx].pt]
+        return np.dstack((matches_1, matches_2))
 
-    def draw_matches(self, frame1, frame2, matches):
+    def draw_matches(self, image, matches):
         to_int = lambda x: tuple(int(round(c)) for c in x)
-        frame_with_matches = frame1["image"].copy()
+        frame_with_matches = image.copy()
         for m in matches:
-            current_pos = to_int(frame1["key_pts"][m.queryIdx].pt)
-            last_pos = to_int(frame2["key_pts"][m.trainIdx].pt)
-            cv.circle(
-                frame_with_matches,
-                current_pos,
-                radius=4,
-                color=(0, 0, 255),
-            )
-            cv.circle(
-                frame_with_matches,
-                last_pos,
-                radius=2,
-                color=(255, 0, 0),
-            )
-            cv.line(
+            current_pos = to_int(m[..., 0])
+            last_pos = to_int(m[..., 1])
+            self.__drawer__(
                 frame_with_matches,
                 current_pos,
                 last_pos,
-                color=(0, 255, 0),
             )
         cv.imshow("", frame_with_matches)
 
@@ -87,20 +81,39 @@ class StatefulMatcher:
         self.__matcher__ = matcher
         self.__drawer__ = drawer
         self.__old_frame__ = None
-        self.draw_matches = lambda m: None
+        self.draw_matches = lambda: None
 
     def match_keypoints(self, new_frame):
-        good_matches = None
+        matches = None
         if self.__old_frame__ is not None:
-            good_matches = self.__matcher__(
+            matches = self.__matcher__(
                 new_frame,
                 self.__old_frame__,
             )
-            old_frame = self.__old_frame__
-            self.draw_matches = lambda m: self.__drawer__(
-                new_frame,
-                old_frame,
-                m,
+            self.draw_matches = lambda: self.__drawer__(
+                new_frame["image"],
+                matches,
             )
         self.__old_frame__ = new_frame
-        return good_matches
+        return matches
+
+
+def draw_match(image, match1, match2):
+    cv.circle(
+        image,
+        match1,
+        radius=4,
+        color=(0, 0, 255),
+    )
+    cv.circle(
+        image,
+        match2,
+        radius=2,
+        color=(255, 0, 0),
+    )
+    cv.line(
+        image,
+        match1,
+        match2,
+        color=(0, 255, 0),
+    )
