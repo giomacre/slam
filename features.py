@@ -1,25 +1,6 @@
 import cv2 as cv
 import numpy as np
 
-# Detection
-
-orb = cv.ORB_create()
-
-
-def compute_orb_features(frames):
-    for frame_id, frame in enumerate(frames):
-        key_pts = orb.detect(frame, None)
-        key_pts, desc = orb.compute(frame, key_pts)
-        yield {
-            "frame_id": frame_id,
-            "image": frame,
-            "key_pts": key_pts,
-            "desc": desc,
-        }
-
-
-# Matching
-
 
 def create_orb_flann_matcher():
     FLANN_INDEX_LSH = 6
@@ -31,11 +12,7 @@ def create_orb_flann_matcher():
     )
 
     cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
-    return KeyPointMatcher(cv_matcher.knnMatch, draw_match)
-
-
-def create_stateful_orb_flann_matcher():
-    matcher = create_orb_flann_matcher()
+    matcher = KeyPointMatcher(cv_matcher.knnMatch, draw_match)
     return StatefulMatcher(
         matcher.match_keypoints,
         matcher.draw_matches,
@@ -78,10 +55,9 @@ class KeyPointMatcher:
 
 class StatefulMatcher:
     def __init__(self, matcher, drawer):
+        self.draw_matches = drawer
         self.__matcher__ = matcher
-        self.__drawer__ = drawer
         self.__old_frame__ = None
-        self.draw_matches = lambda: None
 
     def match_keypoints(self, new_frame):
         matches = None
@@ -89,10 +65,6 @@ class StatefulMatcher:
             matches = self.__matcher__(
                 new_frame,
                 self.__old_frame__,
-            )
-            self.draw_matches = lambda: self.__drawer__(
-                new_frame["image"],
-                matches,
             )
         self.__old_frame__ = new_frame
         return matches
