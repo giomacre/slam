@@ -1,6 +1,6 @@
 import cv2 as cv
 
-SCALE = 1
+SCALE = 2
 
 def video_stream(video_path):
     video = cv.VideoCapture(video_path)
