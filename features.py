@@ -28,10 +28,9 @@ def create_stateful_matcher(matcher):
 
 
 def create_bruteforce_matcher():
-    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING2, crossCheck=False)
+    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING2)
     return KeyPointMatcher(
         lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
-        # lambda m: len(m) > 0,
         ratio_test_filter,
         draw_match,
     )
@@ -81,9 +80,9 @@ class KeyPointMatcher:
 
 
 class StatefulMatcher:
-    def __init__(self, matcher, drawer):
-        self.draw_matches = drawer
-        self.__matcher__ = matcher
+    def __init__(self, match_keypoints, draw_matches):
+        self.draw_matches = draw_matches
+        self.__matcher__ = match_keypoints
         self.__old_frame__ = None
 
     def match_keypoints(self, new_frame):

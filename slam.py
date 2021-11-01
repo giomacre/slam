@@ -41,16 +41,16 @@ pose_estimator = create_orb_pose_estimator(
 camera_R = np.eye(3)
 position = np.zeros((3, 1))
 for frame in frames:
-    frame_id, R, t, matches = pose_estimator.compute_pose(frame)
+    R, t, matches = pose_estimator.compute_pose(frame).values()
     matches_returned = len(matches) if matches is not None else 0
     os.system("clear")
-    print(f"frame {frame_id} returned {matches_returned} matches \n")
+    print(f"frame {frame['frame_id']} returned {matches_returned} matches \n")
     if matches is None:
         continue
     camera_R = R @ camera_R
     position = position + t
     print(f"rotation:\n{camera_R}\n")
     print(f"translation:\n{position}\n")
-    matcher.draw_matches(frame, unnormalize(K, matches))
+    matcher.draw_matches(frame["image"], matches)
     if cv.waitKey(delay=1) == ord("q"):
         break
