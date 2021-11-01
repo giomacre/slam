@@ -1,6 +1,15 @@
 import cv2 as cv
 
-SCALE = 1
+
+def create_frame_skip_filter(take_every=2):
+    def generator():
+        count = 0
+        while True:
+            count += 1
+            yield count % take_every == 0
+
+    generator = generator()
+    return lambda _: next(generator)
 
 
 class Video:
@@ -10,17 +19,20 @@ class Video:
         ret, frame = video.read()
         if not ret:
             exit(code=1)
-        self.height, self.width, *_ = (x // SCALE for x in frame.shape)
+        self.height, self.width, *_ = frame.shape
 
-    def get_video_stream(self):
+    def get_video_stream(self, filter=lambda _: True, scale=2):
+        stream_size = (self.width // scale, self.height // scale)
         video = cv.VideoCapture(self.video_path)
         while video.isOpened():
             ret, frame = video.read()
             if not ret:
                 break
+            if not filter(frame):
+                continue
             yield cv.resize(
                 frame,
-                (self.width, self.height),
+                stream_size,
                 interpolation=cv.INTER_AREA,
-            ) if SCALE > 1 else frame
+            ) if scale > 1 else frame
         video.release()
