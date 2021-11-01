@@ -6,37 +6,61 @@ def create_orb_flann_matcher():
     FLANN_INDEX_LSH = 6
     INDEX_PARAMS = dict(
         algorithm=FLANN_INDEX_LSH,
-        table_number=6,  # 12
-        key_size=12,  # 20
-        multi_probe_level=2,  # 2
+        table_number=6,
+        key_size=12,
+        multi_probe_level=2,
     )
 
     cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
-    matcher = KeyPointMatcher(cv_matcher.knnMatch, draw_match)
+    return KeyPointMatcher(
+        lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
+        ratio_test_filter,
+        draw_match,
+    )
+
+
+def create_stateful_matcher(matcher):
+    matcher = matcher()
     return StatefulMatcher(
         matcher.match_keypoints,
         matcher.draw_matches,
     )
 
 
+def create_bruteforce_matcher():
+    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING, crossCheck=True)
+    return KeyPointMatcher(
+        lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=1),
+        lambda m: len(m) > 0,
+        draw_match,
+    )
+
+
+def ratio_test_filter(matches, thresh_value=0.7):
+    m1, m2 = matches
+    return m1.distance < thresh_value * m2.distance
+
+
 class KeyPointMatcher:
-    def __init__(self, matcher, drawer):
+    def __init__(self, matcher, match_filter, drawer):
         self.__matcher__ = matcher
         self.__drawer__ = drawer
+        self.__filter__ = match_filter
 
     def match_keypoints(self, frame1, frame2):
         matches = self.__matcher__(
             frame1["desc"],
             frame2["desc"],
-            k=2,
         )
+        if len(matches) == 0:
+            return None
         matches_1 = []
         matches_2 = []
-        for m1, m2 in matches:
-            thresh_value = 0.7
-            if m1.distance < thresh_value * m2.distance:
-                matches_1 += [frame1["key_pts"][m1.queryIdx].pt]
-                matches_2 += [frame2["key_pts"][m1.trainIdx].pt]
+        for match in matches:
+            if self.__filter__(match):
+                match = match[0]
+                matches_1 += [frame1["key_pts"][match.queryIdx].pt]
+                matches_2 += [frame2["key_pts"][match.trainIdx].pt]
         return np.dstack((matches_1, matches_2))
 
     def draw_matches(self, image, matches):

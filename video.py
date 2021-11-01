@@ -1,6 +1,6 @@
 import cv2 as cv
 
-SCALE = 2
+SCALE = 1
 
 
 class Video:
