@@ -62,6 +62,8 @@ class KeyPointMatcher:
                 match = match[0]
                 matches_1 += [frame1["key_pts"][match.queryIdx].pt]
                 matches_2 += [frame2["key_pts"][match.trainIdx].pt]
+        if len(matches_1) == 0:
+            return None
         return np.dstack((matches_1, matches_2))
 
     def draw_matches(self, image, matches):
