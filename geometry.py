@@ -1,10 +1,12 @@
 import numpy as np
 import cv2 as cv
-import os
 
 
 def create_orb_pose_estimator(K, matcher):
-    orb = cv.ORB_create()
+    orb = cv.ORB_create(
+        nfeatures=1500,
+        WTA_K=4,
+    )
     return PoseEstimator(
         K,
         lambda f: orb.detectAndCompute(f, None),

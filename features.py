@@ -28,10 +28,11 @@ def create_stateful_matcher(matcher):
 
 
 def create_bruteforce_matcher():
-    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING, crossCheck=True)
+    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING2, crossCheck=False)
     return KeyPointMatcher(
-        lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=1),
-        lambda m: len(m) > 0,
+        lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
+        # lambda m: len(m) > 0,
+        ratio_test_filter,
         draw_match,
     )
 
