@@ -9,21 +9,23 @@ from video import (
     create_frame_skip_filter,
 )
 from features import (
-    create_orb_flann_matcher,
     create_stateful_matcher,
     create_bruteforce_matcher,
 )
 from geometry import (
     create_orb_pose_estimator,
-    unnormalize,
 )
 
 video_path = sys.argv[1]
-FX = 50
+FX = 1
 FY = FX
 
-video = Video(video_path)
-frames = video.get_video_stream(downscale_factor=2)
+video = Video(
+    video_path,
+    create_frame_skip_filter(take_every=5),
+    downscale_factor=2,
+)
+frames = video.get_video_stream()
 matcher = create_stateful_matcher(create_bruteforce_matcher)
 w, h = video.width, video.height
 K = np.array(
@@ -33,6 +35,7 @@ K = np.array(
         [0, 0, 1],
     ]
 )
+print(K)
 pose_estimator = create_orb_pose_estimator(
     K,
     matcher.match_keypoints,
@@ -52,5 +55,5 @@ for frame in frames:
     print(f"rotation:\n{camera_R}\n")
     print(f"translation:\n{position}\n")
     matcher.draw_matches(frame["image"], matches)
-    if cv.waitKey(delay=1) == ord("q"):
+    if cv.waitKey(delay=0) == ord("q"):
         break

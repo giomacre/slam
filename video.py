@@ -13,33 +13,42 @@ def create_frame_skip_filter(take_every=2):
 
 
 class Video:
-    def __init__(self, path):
+    def __init__(
+        self,
+        path,
+        filter=lambda _: True,
+        downscale_factor=1,
+    ):
         self.__path__ = path
         self.__count__ = 0
+        self.__filter__ = filter
+        self.__downscale_factor__ = downscale_factor
         video = cv.VideoCapture(self.__path__)
         ret, frame = video.read()
         if not ret:
             exit(code=1)
-        self.height, self.width, *_ = frame.shape
+        self.height, self.width, *_ = (x // downscale_factor for x in frame.shape)
 
-    def get_video_stream(self, filter=lambda _: True, downscale_factor=1):
-        stream_size = (self.width // downscale_factor, self.height // downscale_factor)
+    def get_video_stream(self):
         video = cv.VideoCapture(self.__path__)
         while video.isOpened():
             ret, frame = video.read()
             if not ret:
                 break
             self.__count__ += 1
-            if not filter(frame):
+            if not self.__filter__(frame):
                 continue
-            if downscale_factor > 1:
+            if self.__downscale_factor__ > 1:
                 frame = cv.resize(
                     frame,
-                    stream_size,
+                    (self.width, self.height),
                     interpolation=cv.INTER_AREA,
                 )
             yield {
                 "frame_id": self.__count__,
                 "image": frame,
             }
-        video.release()
+        self.release()
+
+        def release():
+            video.release()
