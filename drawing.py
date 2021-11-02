@@ -26,3 +26,5 @@ def draw_matches(image, matches):
             color=(0, 255, 0),
         )
     cv.imshow("", image_with_matches)
+    if cv.waitKey(delay=1) == ord("q"):
+        exit(code=0)

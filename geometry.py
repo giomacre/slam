@@ -1,15 +1,12 @@
 import numpy as np
 import cv2 as cv
+from decorators import performance_timer
 
 
-def create_orb_pose_estimator(K, matcher):
-    orb = cv.ORB_create(
-        nfeatures=3000,
-        WTA_K=4,
-    )
+def create_pose_estimator(K, detector, matcher):
     return PoseEstimator(
         K,
-        lambda f: orb.detectAndCompute(f, None),
+        detector,
         matcher,
     )
 
@@ -23,19 +20,17 @@ class PoseEstimator:
 
     def compute_pose(self, frame):
         key_pts, desc = self.__extractor__(frame["image"])
-        pose = {
+        no_pose = {
             "T": None,
             "matches": None,
         }
-        if desc is None:
-            return pose
         frame |= {
             "key_pts": key_pts,
             "desc": desc,
         }
         matches = self.__matcher__(frame)
         if matches is None:
-            return pose
+            return no_pose
         homogeneous = to_homogeneous(matches)
         normalized = self.__Kinv__ @ homogeneous
         cv_view = normalized[:, :2]
@@ -45,7 +40,7 @@ class PoseEstimator:
             self.__K__,
         )
         if E is None:
-            return pose
+            return no_pose
         _, R, t, mask = cv.recoverPose(
             E,
             cv_view[..., 0],
@@ -53,7 +48,7 @@ class PoseEstimator:
             self.__K__,
             mask=mask,
         )
-        pose = {
+        return {
             "T": np.vstack(
                 (
                     np.hstack((R, t)),
@@ -62,7 +57,6 @@ class PoseEstimator:
             ),
             "matches": matches[mask.astype(np.bool).ravel()],
         }
-        return pose
 
 
 def to_homogeneous(x):

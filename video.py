@@ -23,16 +23,15 @@ class Video:
         self.__count__ = 0
         self.__filter__ = filter
         self.__downscale_factor__ = downscale_factor
-        video = cv.VideoCapture(self.__path__)
-        ret, frame = video.read()
+        self.__video__ = cv.VideoCapture(self.__path__)
+        ret, frame = self.__video__.read()
         if not ret:
             exit(code=1)
         self.height, self.width, *_ = (x // downscale_factor for x in frame.shape)
 
     def get_video_stream(self):
-        video = cv.VideoCapture(self.__path__)
-        while video.isOpened():
-            ret, frame = video.read()
+        while self.__video__.isOpened():
+            ret, frame = self.__video__.read()
             if not ret:
                 break
             self.__count__ += 1
@@ -50,5 +49,5 @@ class Video:
             }
         self.release()
 
-        def release():
-            video.release()
+    def release(self):
+        self.__video__.release()
