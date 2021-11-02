@@ -37,7 +37,7 @@ def create_orb_flann_matcher():
 
 
 def create_bruteforce_matcher():
-    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING2)
+    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING)
     return create_feature_matcher(
         lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
         ratio_test_filter(thresh_value=0.5),
