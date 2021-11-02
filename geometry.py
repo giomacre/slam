@@ -4,7 +4,7 @@ import cv2 as cv
 
 def create_orb_pose_estimator(K, matcher):
     orb = cv.ORB_create(
-        nfeatures=1500,
+        nfeatures=3000,
         WTA_K=4,
     )
     return PoseEstimator(
@@ -16,16 +16,15 @@ def create_orb_pose_estimator(K, matcher):
 
 class PoseEstimator:
     def __init__(self, K, feature_extractor, feature_matcher):
-        self.__K__ = K
-        self.__Kinv__ = np.linalg.inv(K)
+        self.__K__ = K[:3, :3]
+        self.__Kinv__ = np.linalg.inv(self.__K__)
         self.__extractor__ = feature_extractor
         self.__matcher__ = feature_matcher
 
     def compute_pose(self, frame):
         key_pts, desc = self.__extractor__(frame["image"])
         pose = {
-            "R": None,
-            "t": None,
+            "T": None,
             "matches": None,
         }
         if desc is None:
@@ -55,8 +54,12 @@ class PoseEstimator:
             mask=mask,
         )
         pose = {
-            "R": R,
-            "t": t,
+            "T": np.vstack(
+                (
+                    np.hstack((R, t)),
+                    [0, 0, 0, 1],
+                )
+            ),
             "matches": matches[mask.astype(np.bool).ravel()],
         }
         return pose
