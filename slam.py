@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
+from collections import deque
 import os
 import sys
 import numpy as np
-import cv2 as cv
 import drawing
 from video import (
     Video,
@@ -42,14 +42,14 @@ K = np.array(
 pose_estimator = create_pose_estimator(
     K,
     create_orb_detector(),
-    #create_orb_flann_matcher(),
+    # create_orb_flann_matcher(),
     create_bruteforce_matcher(),
 )
 
 current_pose = np.eye(4)
-matches_counts = []
+match_counts = deque(maxlen=100)
 for frame in frames:
-    T, matches = pose_estimator.compute_pose(frame).values()
+    T, matches = pose_estimator(frame).values()
     matches = matches if matches is not None else []
     matches_returned = len(matches)
     drawing.draw_matches(
@@ -58,10 +58,13 @@ for frame in frames:
     )
     if matches_returned == 0:
         continue
-    matches_counts += [matches_returned]
+    match_counts += [matches_returned]
     current_pose = T @ current_pose
-    os.system("clear")
     print(
-        f"frame {frame['frame_id']} returned {matches_returned} matches (mean {np.mean(matches_counts)})\n"
+        "frame {} returned {} matches (mean {:.0f})\n".format(
+            frame["frame_id"],
+            matches_returned,
+            np.mean(match_counts),
+        )
     )
     print(f"current_pose:\n{current_pose}\n")

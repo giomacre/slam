@@ -11,7 +11,7 @@ def create_orb_detector():
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
-    # @performance_timer
+    @performance_timer
     def orb_detector(frame):
         return orb.detectAndCompute(frame, None)
 
@@ -55,7 +55,7 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
-    # @performance_timer
+    @performance_timer
     @StatefulDecorator
     def match_keypoints(training_frame, query_frame):
         if any(f["desc"] is None for f in [query_frame, training_frame]):

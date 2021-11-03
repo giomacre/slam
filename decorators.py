@@ -1,16 +1,26 @@
+from collections import deque
 from functools import reduce, update_wrapper, wraps
 
 
-def performance_timer(function):
+def performance_timer(function, mean_window=250):
     from time import perf_counter_ns
     from numpy import mean
+
+    function.times = deque(maxlen=mean_window)
 
     @wraps(function)
     def wrapper(*args, **kwargs):
         start = perf_counter_ns() * 1e-6
         return_value = function(*args, **kwargs)
         end = perf_counter_ns() * 1e-6
-        print(f"{function.__name__} exited in {end -start:.3} ms.")
+        function.times += [end - start]
+        print(
+            "{} returned in {:.3f} ms. (mean: {:.3f})".format(
+                function.__name__,
+                function.times[-1],
+                mean(function.times),
+            )
+        )
         return return_value
 
     return wrapper
