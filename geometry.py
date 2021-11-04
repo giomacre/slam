@@ -19,7 +19,7 @@ def create_pose_estimator(K, detector, matcher):
         matches = matcher(frame)
         if matches is None:
             return no_pose
-        R, t, mask = get_pose_from_camera_points(K, matches)
+        R, t, mask = get_pose_from_image_points(K, matches)
         if R is None:
             return no_pose
         return {
@@ -35,7 +35,7 @@ def create_pose_estimator(K, detector, matcher):
     return compute_pose
 
 
-def get_pose_from_camera_points(K, points):
+def get_pose_from_image_points(K, points):
     E, mask = cv.findEssentialMat(
         points[..., 0],
         points[..., 1],
