@@ -5,9 +5,7 @@ from decorators import performance_timer
 
 def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
-    K_inv = np.linalg.inv(K)
 
-    @performance_timer
     def compute_pose(frame):
         key_pts, desc = detector(frame["image"])
         no_pose = {
@@ -21,8 +19,7 @@ def create_pose_estimator(K, detector, matcher):
         matches = matcher(frame)
         if matches is None:
             return no_pose
-        camera_coords = to_camera_coords(K_inv, matches)
-        R, t, mask = get_pose_from_camera_points(K, camera_coords)
+        R, t, mask = get_pose_from_camera_points(K, matches)
         if R is None:
             return no_pose
         return {
@@ -38,16 +35,18 @@ def create_pose_estimator(K, detector, matcher):
     return compute_pose
 
 
-@performance_timer
 def get_pose_from_camera_points(K, points):
-    cv_view = points[:, :2]
-    E, mask = cv.findEssentialMat(cv_view[..., 0], cv_view[..., 1], K)
+    E, mask = cv.findEssentialMat(
+        points[..., 0],
+        points[..., 1],
+        K,
+    )
     if E is None:
         return [None] * 3
     _, R, t, mask = cv.recoverPose(
         E,
-        cv_view[..., 0],
-        cv_view[..., 1],
+        points[..., 0],
+        points[..., 1],
         K,
         mask=mask,
     )

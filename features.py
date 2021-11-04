@@ -4,6 +4,7 @@ from decorators import StatefulDecorator, performance_timer
 
 # Detectors
 
+
 def create_orb_detector():
     orb = cv.ORB_create(
         nfeatures=1500,
@@ -11,7 +12,6 @@ def create_orb_detector():
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
-    @performance_timer
     def orb_detector(frame):
         return orb.detectAndCompute(frame, None)
 
@@ -19,6 +19,7 @@ def create_orb_detector():
 
 
 # Matchers
+
 
 def create_orb_flann_matcher():
     FLANN_INDEX_LSH = 6
@@ -32,7 +33,7 @@ def create_orb_flann_matcher():
     cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
     return create_feature_matcher(
         lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
-        ratio_test_filter(thresh_value=0.5),
+        ratio_test_filter(),
     )
 
 
@@ -40,7 +41,7 @@ def create_bruteforce_matcher():
     cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING)
     return create_feature_matcher(
         lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
-        ratio_test_filter(thresh_value=0.5),
+        ratio_test_filter(),
     )
 
 
@@ -55,9 +56,8 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
-    @performance_timer
     @StatefulDecorator
-    def match_keypoints(training_frame, query_frame):
+    def match_keypoints(query_frame, training_frame):
         if any(f["desc"] is None for f in [query_frame, training_frame]):
             return None
         matches = matcher(query_frame["desc"], training_frame["desc"])

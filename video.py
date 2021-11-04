@@ -29,6 +29,10 @@ class Video:
             exit(code=1)
         self.height, self.width, *_ = (x // downscale_factor for x in frame.shape)
 
+    @property
+    def frames_read(self):
+        return self.__count__
+
     def get_video_stream(self):
         while self.__video__.isOpened():
             ret, frame = self.__video__.read()
@@ -44,7 +48,6 @@ class Video:
                     interpolation=cv.INTER_AREA,
                 )
             yield {
-                "frame_id": self.__count__,
                 "image": frame,
             }
         self.release()

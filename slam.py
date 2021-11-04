@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from collections import deque
+from itertools import islice
 import os
 import sys
 import numpy as np
@@ -21,13 +22,12 @@ from geometry import (
 np.set_printoptions(precision=3, suppress=True)
 
 video_path = sys.argv[1]
-DOWNSCALE = 2
-FX = 550
+DOWNSCALE = 1
+FX = 525
 FY = FX
 
 video = Video(
     video_path,
-    create_frame_skip_filter(take_every=1),
     downscale_factor=DOWNSCALE,
 )
 frames = video.get_video_stream()
@@ -60,9 +60,10 @@ for frame in frames:
         continue
     match_counts += [matches_returned]
     current_pose = T @ current_pose
+    os.system("clear")
     print(
         "frame {} returned {} matches (mean {:.0f})\n".format(
-            frame["frame_id"],
+            video.frames_read,
             matches_returned,
             np.mean(match_counts),
         )
