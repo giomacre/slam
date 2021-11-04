@@ -1,67 +1,62 @@
 #!/usr/bin/env python3
-
+#%%
+import os
 import sys
 
-sys.path.append("lib/")
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+os.environ["LD_LIBRARY_PATH"] = os.getcwd() + "lib/"
 import pypangolin as pango
+from threading import Thread
 from OpenGL.GL import *
 
 
-def a_callback():
-    print("a pressed")
-
-
-def main():
-    win = pango.CreateWindowAndBind("pySimpleDisplay", 640, 480)
+def setup_pangolin(
+    width,
+    height,
+    focal_length=500,
+    z_near=0.1,
+    z_far=1000,
+    camera_pos=[0.0, 0.5, -3.0],
+    target=[0.0] * 3,
+    up_direction=pango.AxisY,
+):
+    pango.CreateWindowAndBind("", width, height)
     glEnable(GL_DEPTH_TEST)
-
-    pm = pango.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.1, 1000)
-    mv = pango.ModelViewLookAt(-0, 0.5, -3, 0, 0, 0, pango.AxisY)
-    s_cam = pango.OpenGlRenderState(pm, mv)
-
-    ui_width = 180
-
-    handler = pango.Handler3D(s_cam)
-    d_cam = (
-        pango.CreateDisplay()
-        .SetBounds(
-            pango.Attach(0),
-            pango.Attach(1),
-            pango.Attach.Pix(ui_width),
-            pango.Attach(1),
-            -640.0 / 480.0,
-        )
-        .SetHandler(handler)
+    projection_matrix = pango.ProjectionMatrix(
+        width,
+        height,
+        focal_length,
+        focal_length,
+        width // 2,
+        height // 2,
+        z_near,
+        z_far,
     )
-
-    pango.CreatePanel("ui").SetBounds(
-        pango.Attach(0), pango.Attach(1), pango.Attach(0), pango.Attach.Pix(ui_width)
+    model_view = pango.ModelViewLookAt(
+        *camera_pos,
+        *target,
+        up_direction,
     )
-    var_ui = pango.Var("ui")
-    var_ui.a_Button = False
-    var_ui.a_double = (0.0, pango.VarMeta(0, 5))
-    var_ui.an_int = (2, pango.VarMeta(0, 5))
-    var_ui.a_double_log = (3.0, pango.VarMeta(1, 1e4, logscale=True))
-    var_ui.a_checkbox = (False, pango.VarMeta(toggle=True))
-    var_ui.an_int_no_input = 2
-    var_ui.a_str = "sss"
+    render_state = pango.OpenGlRenderState(projection_matrix, model_view)
+    handler = pango.Handler3D(render_state)
+    display = pango.CreateDisplay().SetAspect(width / height).SetHandler(handler)
 
-    ctrl = -96
-    pango.RegisterKeyPressCallback(ctrl + ord("a"), a_callback)
+    return render_state, display
 
+
+def render(width, height):
+    render_state, display = setup_pangolin(width, height)
     while not pango.ShouldQuit():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        if var_ui.a_checkbox:
-            var_ui.an_int = var_ui.a_double
-
-        var_ui.an_int_no_input = var_ui.an_int
-
-        d_cam.Activate(s_cam)
+        display.Activate(render_state)
         pango.glDrawColouredCube()
         pango.FinishFrame()
 
 
 if __name__ == "__main__":
-    main()
+    render_loop = Thread(target=render, args=(1280, 720))
+    render_loop.start()
+    render_loop.join()
+
 # %%
