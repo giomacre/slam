@@ -1,4 +1,23 @@
+from functools import partial
+from multiprocessing import Process, Queue
 import cv2 as cv
+from numpy import block
+
+
+def create_drawer_thread():
+    queue = Queue()
+
+    def drawer_thread(queue):
+        while True:
+            draw_matches(*queue.get(timeout=0.5))
+
+    thread = Process(
+        target=drawer_thread,
+        args=(queue,),
+        daemon=True,
+    )
+    thread.start()
+    return partial(queue.put, block=False)
 
 
 def draw_matches(image, matches):

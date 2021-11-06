@@ -22,16 +22,14 @@ def create_pose_estimator(K, detector, matcher):
         R, t, mask = get_pose_from_image_points(K, matches)
         if R is None:
             return no_pose
-        return ddict(
-            {
-                "T": np.vstack(
-                    (
-                        np.hstack((R, t)),
-                        [0, 0, 0, 1],
-                    )
-                ),
-                "matches": matches[mask.astype(np.bool).ravel()],
-            }
+        return (
+            np.vstack(
+                (
+                    np.hstack((R, t)),
+                    [0, 0, 0, 1],
+                )
+            ),
+            matches[mask.astype(np.bool).ravel()],
         )
 
     return compute_pose

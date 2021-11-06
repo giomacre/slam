@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#%%
 import os
 import sys
 
@@ -38,9 +37,16 @@ def setup_pangolin(
         *target,
         up_direction,
     )
-    render_state = pango.OpenGlRenderState(projection_matrix, model_view)
+    render_state = pango.OpenGlRenderState(
+        projection_matrix,
+        model_view,
+    )
     handler = pango.Handler3D(render_state)
-    display = pango.CreateDisplay().SetAspect(width / height).SetHandler(handler)
+    display = (
+        pango.CreateDisplay()
+        .SetAspect(width / height)
+        .SetHandler(handler)
+    )
 
     return render_state, display
 
@@ -56,8 +62,10 @@ def render(width, height):
 
 
 if __name__ == "__main__":
-    render_loop = Thread(target=render, args=(1280, 720))
+    render_loop = Thread(
+        target=render,
+        args=(1280, 720),
+        daemon=True,
+    )
     render_loop.start()
     render_loop.join()
-
-# %%
