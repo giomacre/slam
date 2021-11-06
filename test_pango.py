@@ -4,10 +4,11 @@ import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-os.environ["LD_LIBRARY_PATH"] = os.getcwd() + "lib/"
-import pypangolin as pango
+import lib.pypangolin as pango
 from threading import Thread
 from OpenGL.GL import *
+
+print(dir(pango))
 
 
 def setup_pangolin(

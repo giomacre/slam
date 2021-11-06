@@ -1,4 +1,5 @@
 import cv2 as cv
+from decorators import ddict
 
 
 def create_frame_skip_filter(take_every=2):
@@ -19,15 +20,17 @@ class Video:
         filter=lambda _: True,
         downscale_factor=1,
     ):
-        self.__path__ = path
-        self.__count__ = 0
         self.__filter__ = filter
+        self.__count__ = 0
         self.__downscale_factor__ = downscale_factor
-        self.__video__ = cv.VideoCapture(self.__path__)
-        ret, frame = self.__video__.read()
-        if not ret:
-            exit(code=1)
-        self.height, self.width, *_ = (x // downscale_factor for x in frame.shape)
+        self.__video__ = cv.VideoCapture(path)
+        self.height, self.width, *_ = (
+            self.__video__.get(p) // downscale_factor
+            for p in [
+                cv.CAP_PROP_FRAME_HEIGHT,
+                cv.CAP_PROP_FRAME_WIDTH,
+            ]
+        )
 
     @property
     def frames_read(self):
@@ -47,9 +50,11 @@ class Video:
                     (self.width, self.height),
                     interpolation=cv.INTER_AREA,
                 )
-            yield {
-                "image": frame,
-            }
+            yield ddict(
+                {
+                    "image": frame,
+                }
+            )
         self.release()
 
     def release(self):

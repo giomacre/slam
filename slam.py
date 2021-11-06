@@ -2,6 +2,7 @@
 
 from collections import deque
 from itertools import islice
+import logging
 import os
 import sys
 import numpy as np
@@ -18,6 +19,7 @@ from features import (
 from geometry import (
     create_pose_estimator,
 )
+from slam_logging import create_logger
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -30,6 +32,7 @@ video = Video(
     video_path,
     downscale_factor=DOWNSCALE,
 )
+logger = create_logger(lambda: video.frames_read)
 frames = video.get_video_stream()
 w, h = video.width, video.height
 K = np.array(
@@ -46,26 +49,21 @@ pose_estimator = create_pose_estimator(
     create_bruteforce_matcher(),
 )
 
+tracked_frames = []
 current_pose = np.eye(4)
-match_counts = deque(maxlen=100)
 for frame in frames:
     T, matches = pose_estimator(frame).values()
     matches = matches if matches is not None else []
-    matches_returned = len(matches)
     drawing.draw_matches(
-        frame["image"],
+        frame.image,
         matches,
     )
-    if matches_returned == 0:
-        continue
-    match_counts += [matches_returned]
-    current_pose = T @ current_pose
-    os.system("clear")
-    print(
-        "frame {} returned {} matches (mean {:.0f})\n".format(
-            video.frames_read,
-            matches_returned,
-            np.mean(match_counts),
-        )
-    )
-    print(f"current_pose:\n{current_pose}\n")
+    match (frame.desc, T, len(tracked_frames)):
+        case (None, *_): continue
+        case (*_, 0): frame.pose = np.eye(4) 
+        case (_, None, n) if n > 0: frame.pose = tracked_frames[-1].pose
+        case _: frame.pose = T @ tracked_frames[-1].pose
+    tracked_frames += [frame]
+    #os.system("cls 2>/dev/null || clear")
+    logger.log_matches(matches)
+    logger.log_pose(frame.pose)

@@ -1,2 +1,2 @@
-*.raw
 __pycache__/
+.vscode/

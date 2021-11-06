@@ -58,9 +58,9 @@ def ratio_test_filter(thresh_value=0.7):
 def create_feature_matcher(matcher, match_filter):
     @StatefulDecorator
     def match_keypoints(query_frame, training_frame):
-        if any(f["desc"] is None for f in [query_frame, training_frame]):
+        if any(f.desc is None for f in [query_frame, training_frame]):
             return None
-        matches = matcher(query_frame["desc"], training_frame["desc"])
+        matches = matcher(query_frame.desc, training_frame.desc)
         if len(matches) == 0:
             return None
         matches_1 = []
@@ -68,8 +68,8 @@ def create_feature_matcher(matcher, match_filter):
         for match in matches:
             if match_filter(match):
                 match = match[0]
-                matches_1 += [query_frame["key_pts"][match.queryIdx].pt]
-                matches_2 += [training_frame["key_pts"][match.trainIdx].pt]
+                matches_1 += [query_frame.key_pts[match.queryIdx].pt]
+                matches_2 += [training_frame.key_pts[match.trainIdx].pt]
         if len(matches_1) == 0:
             return None
         return np.dstack((matches_1, matches_2))

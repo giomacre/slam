@@ -1,17 +1,17 @@
 import numpy as np
 import cv2 as cv
-from decorators import performance_timer
+from decorators import performance_timer, ddict
 
 
 def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
 
     def compute_pose(frame):
-        key_pts, desc = detector(frame["image"])
         no_pose = {
             "T": None,
             "matches": None,
         }
+        key_pts, desc = detector(frame.image)
         frame |= {
             "key_pts": key_pts,
             "desc": desc,
@@ -22,15 +22,17 @@ def create_pose_estimator(K, detector, matcher):
         R, t, mask = get_pose_from_image_points(K, matches)
         if R is None:
             return no_pose
-        return {
-            "T": np.vstack(
-                (
-                    np.hstack((R, t)),
-                    [0, 0, 0, 1],
-                )
-            ),
-            "matches": matches[mask.astype(np.bool).ravel()],
-        }
+        return ddict(
+            {
+                "T": np.vstack(
+                    (
+                        np.hstack((R, t)),
+                        [0, 0, 0, 1],
+                    )
+                ),
+                "matches": matches[mask.astype(np.bool).ravel()],
+            }
+        )
 
     return compute_pose
 

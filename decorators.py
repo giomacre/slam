@@ -40,3 +40,13 @@ class StatefulDecorator:
             call_args = reduce(list.__add__, self.__old_args__)
             return_value = self.__function__(*call_args, **kwargs)
         return return_value
+
+
+class ddict(dict):
+    __getattr__ = (
+        lambda *args: item
+        if type(item := dict.__getitem__(*args)) is not dict
+        else ddict(item)
+    )
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
