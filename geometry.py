@@ -1,16 +1,13 @@
 import numpy as np
 import cv2 as cv
-from decorators import performance_timer, ddict
+from decorators import performance_timer
 
 
 def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
 
     def compute_pose(frame):
-        no_pose = {
-            "T": None,
-            "matches": None,
-        }
+        no_pose = [None] * 2
         key_pts, desc = detector(frame.image)
         frame |= {
             "key_pts": key_pts,

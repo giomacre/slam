@@ -25,7 +25,7 @@ class Video:
         self.__downscale_factor__ = downscale_factor
         self.__video__ = cv.VideoCapture(path)
         self.height, self.width, *_ = (
-            self.__video__.get(p) // downscale_factor
+            int(self.__video__.get(p)) // downscale_factor
             for p in [
                 cv.CAP_PROP_FRAME_HEIGHT,
                 cv.CAP_PROP_FRAME_WIDTH,

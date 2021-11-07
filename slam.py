@@ -2,9 +2,10 @@
 
 from collections import deque
 from itertools import islice
+import os
 import sys
 import numpy as np
-from drawing import create_drawer_thread
+from drawing import create_drawer_process
 from video import (
     Video,
     create_frame_skip_filter,
@@ -18,6 +19,7 @@ from geometry import (
     create_pose_estimator,
 )
 from slam_logging import create_logger
+from visualization import create_3d_visualization_process
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -32,13 +34,12 @@ if __name__ == "__main__":
         downscale_factor=DOWNSCALE,
     )
     logger = create_logger(lambda: video.frames_read)
-    send_draw_task = create_drawer_thread()
     frames = video.get_video_stream()
-    w, h = video.width, video.height
+    width, height = video.width, video.height
     K = np.array(
         [
-            [FX / DOWNSCALE, 0, w / 2, 0],
-            [0, FY / DOWNSCALE, h / 2, 0],
+            [FX / DOWNSCALE, 0, width / 2, 0],
+            [0, FY / DOWNSCALE, height / 2, 0],
             [0, 0, 1, 0],
         ]
     )
@@ -48,6 +49,8 @@ if __name__ == "__main__":
         # create_orb_flann_matcher(),
         create_bruteforce_matcher(),
     )
+    send_draw_task = create_drawer_process()
+    send_pango_task = create_3d_visualization_process(width, height)
 
     tracked_frames = []
     current_pose = np.eye(4)
@@ -62,6 +65,7 @@ if __name__ == "__main__":
             case (_, None, n) if n > 0: frame.pose = tracked_frames[-1].pose
             case _: frame.pose = T @ tracked_frames[-1].pose
         tracked_frames += [frame]
-        # os.system("cls 2>/dev/null || clear")
+        send_pango_task((None,))
+        os.system("cls 2>/dev/null || clear")
         logger.log_matches(matches)
         logger.log_pose(frame.pose)
