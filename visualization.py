@@ -7,8 +7,6 @@ import lib.pypangolin as pango
 from threading import Thread
 from OpenGL.GL import *
 
-print(dir(pango))
-
 
 def setup_pangolin(
     width,
@@ -20,8 +18,9 @@ def setup_pangolin(
     target=[0.0] * 3,
     up_direction=pango.AxisY,
 ):
-    pango.CreateWindowAndBind("", width, height)
+    window = pango.CreateWindowAndBind("", width, height)
     glEnable(GL_DEPTH_TEST)
+    window.RemoveCurrent()
     projection_matrix = pango.ProjectionMatrix(
         width,
         height,
@@ -48,24 +47,20 @@ def setup_pangolin(
         .SetHandler(handler)
     )
 
-    return render_state, display
+    return window, render_state, display
 
 
-def render(width, height):
-    render_state, display = setup_pangolin(width, height)
+def render(window, render_state, display):
+    window.MakeCurrent()
     while not pango.ShouldQuit():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
         display.Activate(render_state)
         pango.glDrawColouredCube()
         pango.FinishFrame()
 
 
 if __name__ == "__main__":
-    render_loop = Thread(
-        target=render,
-        args=(1280, 720),
-        daemon=True,
-    )
+    ctx = setup_pangolin(1024, 768)
+    render_loop = Thread(target=render, args=ctx)
     render_loop.start()
     render_loop.join()
