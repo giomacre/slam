@@ -50,11 +50,7 @@ class Video:
                     (self.width, self.height),
                     interpolation=cv.INTER_AREA,
                 )
-            yield ddict(
-                {
-                    "image": frame,
-                }
-            )
+            yield ddict(image=frame)
         self.release()
 
     def release(self):

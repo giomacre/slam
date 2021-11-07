@@ -7,11 +7,12 @@ from decorators import StatefulDecorator, performance_timer
 
 def create_orb_detector():
     orb = cv.ORB_create(
-        nfeatures=1500,
+        nfeatures=3000,
         WTA_K=2,
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
+    # @performance_timer
     def orb_detector(frame):
         return orb.detectAndCompute(frame, None)
 
@@ -25,9 +26,9 @@ def create_orb_flann_matcher():
     FLANN_INDEX_LSH = 6
     INDEX_PARAMS = dict(
         algorithm=FLANN_INDEX_LSH,
-        table_number=4,
-        key_size=12,
-        multi_probe_level=1,
+        table_number=8,
+        key_size=20,
+        multi_probe_level=2,
     )
 
     cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
@@ -56,6 +57,7 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
+    # @performance_timer
     @StatefulDecorator
     def match_keypoints(query_frame, training_frame):
         if any(f.desc is None for f in [query_frame, training_frame]):

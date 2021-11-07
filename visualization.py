@@ -3,10 +3,11 @@ import os
 import sys
 from worker import create_worker_process
 from decorators import ddict
+import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 import pypangolin as pango
-from OpenGL.GL import *
+import OpenGL.GL as gl
 
 
 def setup_pangolin(
@@ -18,11 +19,11 @@ def setup_pangolin(
     z_far=1000,
     camera_pos=[0.0, 0.5, -3.0],
     target=[0.0] * 3,
-    up_direction=pango.AxisY,
+    up_direction=[0.0, -1.0, 0.0],
 ):
     pango.CreateWindowAndBind("", width, height)
-    glEnable(GL_DEPTH_TEST)
-    projection_matrix = pango.ProjectionMatrix(
+    gl.glEnable(gl.GL_DEPTH_TEST)
+    projection_matrix = pango.ProjectionMatrixRDF_TopLeft(
         width,
         height,
         focal_length,
@@ -32,10 +33,10 @@ def setup_pangolin(
         z_near,
         z_far,
     )
-    model_view = pango.ModelViewLookAt(
+    model_view = pango.ModelViewLookAtRDF(
         *camera_pos,
         *target,
-        up_direction,
+        *up_direction,
     )
     render_state = pango.OpenGlRenderState(
         projection_matrix,
@@ -49,17 +50,25 @@ def setup_pangolin(
 
 def create_3d_visualization_process(width, height):
     context = ddict(
-        {
-            "render_state": None,
-            "display": None,
-        }
+        render_state=None,
+        display=None,
     )
     setup = partial(setup_pangolin, width, height, context)
 
-    def draw_cube(context, _):
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    def draw_cube(context, Kinv, poses, points):
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         context.display.Activate(context.render_state)
-        pango.glDrawColouredCube()
+        gl.glColor(0.0, 0.0, 1.0)
+        for pose in poses:
+            pango.glDrawFrustum(
+                Kinv[:3, :3],
+                width,
+                height,
+                np.linalg.inv(pose),
+                0.5,
+            )
+        gl.glColor(1.0, 0.0, 0.0)
+        pango.glDrawPoints(points[:, :3])
         pango.FinishFrame()
 
     visualization_loop = partial(draw_cube, context)

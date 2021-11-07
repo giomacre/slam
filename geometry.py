@@ -1,18 +1,19 @@
 import numpy as np
 import cv2 as cv
-from decorators import performance_timer
+from decorators import ddict, performance_timer
 
 
 def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
 
+    # @performance_timer
     def compute_pose(frame):
         no_pose = [None] * 2
         key_pts, desc = detector(frame.image)
-        frame |= {
-            "key_pts": key_pts,
-            "desc": desc,
-        }
+        frame |= ddict(
+            key_pts=key_pts,
+            desc=desc,
+        )
         matches = matcher(frame)
         if matches is None:
             return no_pose
@@ -48,21 +49,3 @@ def get_pose_from_image_points(K, points):
         mask=mask,
     )
     return R, t, mask
-
-
-def to_homogeneous(x):
-    return np.concatenate(
-        (
-            x,
-            np.ones(shape=(x.shape[0], 1, x.shape[2])),
-        ),
-        axis=1,
-    )
-
-
-def to_camera_coords(K_inv, x):
-    return K_inv @ to_homogeneous(x)
-
-
-def to_image_coords(K, x):
-    return (K @ x)[:, :2, :]

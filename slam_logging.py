@@ -22,8 +22,6 @@ def create_logger(frame_id):
         )
 
     return ddict(
-        {
-            "log_matches": partial(log_matches, frame_id, previous_counts),
-            "log_pose": lambda pose: print(pose),
-        }
+        log_matches=partial(log_matches, frame_id, previous_counts),
+        log_pose=lambda pose: print(pose),
     )
