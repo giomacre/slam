@@ -5,7 +5,7 @@ from worker import create_worker_process
 from decorators import ddict
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-import lib.pypangolin as pango
+import pypangolin as pango
 from OpenGL.GL import *
 
 
