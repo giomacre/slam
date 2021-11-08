@@ -1,25 +1,59 @@
 from functools import partial
-from multiprocessing import Process, Queue
+from queue import Empty, Queue
+from threading import Thread
+
+from decorators import ddict
 
 
-def create_worker_process(
+def create_thread_context():
+    thread_context = ddict()
+    thread_context |= ddict(
+        __terminated__=False,
+        terminated=partial(
+            getattr,
+            thread_context,
+            "__terminated__",
+        ),
+        close=partial(
+            setattr,
+            thread_context,
+            "__terminated__",
+            True,
+        ),
+        threads=[],
+    )
+    return thread_context
+
+
+def create_worker(
     target,
-    terminate=lambda: False,
+    thread_context,
     one_shot=lambda: None,
 ):
     queue = Queue()
 
+    def register_task(task):
+        queue.put(task)
+        return queue.join
+
     def worker_loop(queue):
         one_shot()
         while True:
-            target(*queue.get(timeout=1))
-            if terminate():
+            try:
+                target(*queue.get(timeout=0.015))
+                queue.task_done()
+            except Empty:
+                target()
+                pass
+            if thread_context.terminated():
+                while not queue.empty():
+                    queue.get()
+                    queue.task_done()
                 break
 
-    process = Process(
+    thread = Thread(
         target=worker_loop,
         args=(queue,),
-        daemon=True,
     )
-    process.start()
-    return partial(queue.put, block=False)
+    thread_context.threads += [thread]
+    return register_task

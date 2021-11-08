@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-from decorators import StatefulDecorator, performance_timer
+from decorators import stateful_decorator, performance_timer
 
 # Detectors
 
@@ -57,8 +57,8 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
-    # @performance_timer
-    @StatefulDecorator
+    @performance_timer(mean_window=100)
+    @stateful_decorator(keep=2, append_empty=True)
     def match_keypoints(query_frame, training_frame):
         if any(f.desc is None for f in [query_frame, training_frame]):
             return None

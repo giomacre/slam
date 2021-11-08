@@ -1,8 +1,8 @@
 from functools import partial
 import os
 import sys
-from worker import create_worker_process
-from decorators import ddict
+from worker import create_worker
+from decorators import ddict, stateful_decorator
 import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
@@ -48,17 +48,23 @@ def setup_pangolin(
     context.display = display
 
 
-def create_3d_visualization_process(width, height):
-    context = ddict(
+def create_map_thread(width, height, thread_context):
+    render_context = ddict(
         render_state=None,
         display=None,
     )
-    setup = partial(setup_pangolin, width, height, context)
+    setup_window = partial(setup_pangolin, width, height, render_context)
 
-    def draw_cube(context, Kinv, poses, points):
+    def draw_cube(
+        context,
+        Kinv,
+        poses,
+        points,
+    ):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         context.display.Activate(context.render_state)
-        gl.glColor(0.0, 0.0, 1.0)
+        gl.glLineWidth(2)
+        gl.glColor(1.0, 1.0, 0.0)
         for pose in poses:
             pango.glDrawFrustum(
                 Kinv[:3, :3],
@@ -67,13 +73,23 @@ def create_3d_visualization_process(width, height):
                 np.linalg.inv(pose),
                 0.5,
             )
+        gl.glPointSize(2)
         gl.glColor(1.0, 0.0, 0.0)
         pango.glDrawPoints(points[:, :3])
         pango.FinishFrame()
 
-    visualization_loop = partial(draw_cube, context)
-    return create_worker_process(
+    decorator = stateful_decorator(
+        keep=1,
+        append_empty=False,
+    )
+    visualization_loop = decorator(
+        partial(
+            draw_cube,
+            render_context,
+        )
+    )
+    return create_worker(
         visualization_loop,
-        one_shot=setup,
-        terminate=pango.ShouldQuit,
+        thread_context,
+        one_shot=setup_window,
     )

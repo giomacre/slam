@@ -1,13 +1,33 @@
+from functools import partial
 import cv2 as cv
+from matplotlib.pyplot import draw
+from decorators import stateful_decorator
 
-from worker import create_worker_process
-
-
-def create_drawer_process():
-    return create_worker_process(draw_matches)
+from worker import create_worker
 
 
-def draw_matches(image, matches):
+def create_drawer_thread(thread_context):
+    decorator = stateful_decorator(
+        keep=1,
+        append_empty=False,
+    )
+    draw_loop = decorator(
+        partial(
+            draw_matches,
+            thread_context.close,
+        )
+    )
+    return create_worker(
+        draw_loop,
+        thread_context,
+    )
+
+
+def draw_matches(
+    on_quit,
+    image,
+    matches,
+):
     to_int = lambda x: tuple(int(round(c)) for c in x)
     image_with_matches = image.copy()
     for m in matches:
@@ -32,4 +52,5 @@ def draw_matches(image, matches):
             color=(0, 255, 0),
         )
     cv.imshow("", image_with_matches)
-    cv.waitKey(delay=1)
+    if cv.waitKey(delay=1) == ord("q"):
+        on_quit()
