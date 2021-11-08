@@ -69,7 +69,6 @@ if __name__ == "__main__":
     points = np.empty((1, 4))
     for frame in frames:
         T, matches = pose_estimator(frame)
-        matches = matches if matches is not None else []
         wait_draw = send_draw_task((frame.image, matches))
         context = (
             frame.desc,
@@ -108,9 +107,6 @@ if __name__ == "__main__":
             break
         wait_draw()
         wait_map()
-        # os.system("cls" if sys.platform == "win32" else "clear")
-        # logger.log_matches(matches)
-        # logger.log_pose(frame.pose)
 
 for thread in thread_context.threads:
     thread.join()

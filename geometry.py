@@ -1,21 +1,22 @@
 import numpy as np
 import cv2 as cv
-from decorators import ddict, performance_timer
+from decorators import ddict
+from slam_logging import log_pose_estimation
 
 
 def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
 
-    # @performance_timer
+    @log_pose_estimation
     def compute_pose(frame):
-        no_pose = [None] * 2
+        no_pose = None, []
         key_pts, desc = detector(frame.image)
         frame |= ddict(
             key_pts=key_pts,
             desc=desc,
         )
         matches = matcher(frame)
-        if matches is None:
+        if len(matches) == 0:
             return no_pose
         R, t, mask = get_pose_from_image_points(K, matches)
         if R is None:

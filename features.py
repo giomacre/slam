@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
-from decorators import stateful_decorator, performance_timer
+from decorators import stateful_decorator
+from slam_logging import log_feature_match, log_feature_extraction
 
 # Detectors
 
@@ -12,7 +13,7 @@ def create_orb_detector():
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
-    # @performance_timer
+    @log_feature_extraction
     def orb_detector(frame):
         return orb.detectAndCompute(frame, None)
 
@@ -57,14 +58,18 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
-    @performance_timer(mean_window=100)
-    @stateful_decorator(keep=2, append_empty=True)
+    @log_feature_match
+    @stateful_decorator(
+        keep=2,
+        append_empty=True,
+        default_value=lambda: [],
+    )
     def match_keypoints(query_frame, training_frame):
         if any(f.desc is None for f in [query_frame, training_frame]):
-            return None
+            return []
         matches = matcher(query_frame.desc, training_frame.desc)
         if len(matches) == 0:
-            return None
+            return []
         matches_1 = []
         matches_2 = []
         for match in matches:
@@ -73,7 +78,7 @@ def create_feature_matcher(matcher, match_filter):
                 matches_1 += [query_frame.key_pts[match.queryIdx].pt]
                 matches_2 += [training_frame.key_pts[match.trainIdx].pt]
         if len(matches_1) == 0:
-            return None
+            return []
         return np.dstack((matches_1, matches_2))
 
     return match_keypoints
