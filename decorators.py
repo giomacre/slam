@@ -10,6 +10,7 @@ class ddict(dict):
     )
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
+    __dir__ = dict.keys
 
 
 def use_arguments(decorator):
@@ -26,18 +27,18 @@ def use_arguments(decorator):
 def stateful_decorator(
     function,
     *_,
-    keep,
-    append_empty,
-    default_value=lambda: None,
+    needs,
+    use_defaults=False,
+    default_return=None,
 ):
-    old_args = deque(maxlen=keep)
+    old_args = deque(maxlen=needs)
 
     @wraps(function)
     def call(*args, **kwargs):
-        return_value = default_value()
-        if len(args) > 0 or append_empty:
+        return_value = default_return
+        if len(args) > 0:
             old_args.appendleft(list(args))
-        if len(old_args) == keep:
+        if len(old_args) == needs or use_defaults:
             call_args = reduce(list.__add__, old_args)
             return_value = function(*call_args, **kwargs)
         return return_value

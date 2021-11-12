@@ -1,6 +1,5 @@
 import cv2 as cv
 import numpy as np
-from decorators import stateful_decorator
 from slam_logging import log_feature_match, log_feature_extraction
 
 # Detectors
@@ -8,35 +7,30 @@ from slam_logging import log_feature_match, log_feature_extraction
 
 def create_orb_detector():
     orb = cv.ORB_create(
-        nfeatures=3000,
+        nfeatures=1500,
         WTA_K=2,
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
     @log_feature_extraction
     def orb_detector(frame):
-        return orb.detectAndCompute(frame, None)
+        key_pts = orb.detect(frame.image)
+        key_pts, frame.desc = orb.compute(frame.image, key_pts)
+        if frame.desc is None:
+            return frame
+        frame.key_pts = np.array([k.pt for k in key_pts])
+        frame.origin_pts = frame.key_pts.copy()
+        frame.origin_frames = np.full(
+            (len(frame.key_pts),),
+            fill_value=frame.id,
+        )
+        frame.tracked_idxs = np.arange(len(frame.key_pts))
+        return frame
 
     return orb_detector
 
 
 # Matchers
-
-
-def create_orb_flann_matcher():
-    FLANN_INDEX_LSH = 6
-    INDEX_PARAMS = dict(
-        algorithm=FLANN_INDEX_LSH,
-        table_number=8,
-        key_size=20,
-        multi_probe_level=2,
-    )
-
-    cv_matcher = cv.FlannBasedMatcher(INDEX_PARAMS)
-    return create_feature_matcher(
-        lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
-        ratio_test_filter(),
-    )
 
 
 def create_bruteforce_matcher():
@@ -59,26 +53,26 @@ def ratio_test_filter(thresh_value=0.7):
 
 def create_feature_matcher(matcher, match_filter):
     @log_feature_match
-    @stateful_decorator(
-        keep=2,
-        append_empty=True,
-        default_value=lambda: [],
-    )
-    def match_keypoints(query_frame, training_frame):
-        if any(f.desc is None for f in [query_frame, training_frame]):
-            return []
-        matches = matcher(query_frame.desc, training_frame.desc)
+    def match_keypoints(query_frame, train_frame):
+        no_match = [[]] * 3
+        if any(f.desc is None for f in [query_frame, train_frame]):
+            return no_match
+        matches = matcher(query_frame.desc, train_frame.desc)
         if len(matches) == 0:
-            return []
-        matches_1 = []
-        matches_2 = []
-        for match in matches:
-            if match_filter(match):
-                match = match[0]
-                matches_1 += [query_frame.key_pts[match.queryIdx].pt]
-                matches_2 += [training_frame.key_pts[match.trainIdx].pt]
-        if len(matches_1) == 0:
-            return []
-        return np.dstack((matches_1, matches_2))
+            return no_match
+        indices = np.vstack(
+            [(m[0].queryIdx, m[0].trainIdx) for m in matches if match_filter(m)]
+        )
+        if len(indices) == 0:
+            return no_match
+        query_idxs, train_idxs = indices[:, 0], indices[:, 1]
+        query_pts, train_pts = query_frame.key_pts, train_frame.key_pts
+        query_matches = query_pts[query_idxs]
+        train_matches = train_pts[train_idxs]
+        return (
+            np.dstack((query_matches, train_matches)),
+            query_idxs,
+            train_idxs,
+        )
 
     return match_keypoints

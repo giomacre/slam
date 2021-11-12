@@ -1,23 +1,27 @@
+from functools import wraps
 import cv2 as cv
 from decorators import ddict
 
 
-def create_frame_skip_filter(take_every=2):
-    def generator():
+def skip_items(iterator, take_every=2):
+    def __skip_items__():
         count = 0
         while True:
             count += 1
-            yield count % take_every == 0
+            try:
+                current_value = next(iterator)
+            except StopIteration:
+                break
+            if count % take_every == 0:
+                yield current_value
 
-    generator = generator()
-    return lambda _: next(generator)
+    return __skip_items__()
 
 
 class Video:
     def __init__(
         self,
         path,
-        filter=lambda _: True,
         downscale_factor=1,
     ):
         self.__filter__ = filter
@@ -42,8 +46,6 @@ class Video:
             if not ret:
                 break
             self.__count__ += 1
-            if not self.__filter__(frame):
-                continue
             if self.__downscale_factor__ > 1:
                 frame = cv.resize(
                     frame,

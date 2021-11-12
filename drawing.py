@@ -7,10 +7,7 @@ from worker import create_worker
 
 
 def create_drawer_thread(thread_context):
-    decorator = stateful_decorator(
-        keep=1,
-        append_empty=False,
-    )
+    decorator = stateful_decorator(needs=1)
     draw_loop = decorator(
         partial(
             draw_matches,

@@ -35,29 +35,9 @@ def performance_timer(
     return wrapper
 
 
-log_pose_estimation = performance_timer(value_analysis=lambda v: f"{len(v[1])} matches")
+log_pose_estimation = performance_timer(value_analysis=lambda v: f"{len(v)} matches")
 log_feature_extraction = performance_timer(
-    value_analysis=lambda v: f"{len(v[0]) if v[0] is not None else 0} features"
+    value_analysis=lambda v: f"{len(v.desc) if v.desc is not None else 0} features"
 )
-log_feature_match = performance_timer(value_analysis=lambda v: f"{len(v)} matches")
-
-
-def create_logger(frame_id):
-    previous_counts = deque(maxlen=100)
-
-    def log_matches(frame_id, previous_counts, matches):
-        last_count = len(matches) if matches is not None else 0
-        previous_counts += [last_count]
-
-        print(
-            "frame {} returned {} valid matches (mean {:.0f})\n".format(
-                frame_id(),
-                last_count,
-                mean(previous_counts),
-            )
-        )
-
-    return ddict(
-        log_matches=partial(log_matches, frame_id, previous_counts),
-        log_pose=lambda pose: print(pose),
-    )
+log_feature_match = performance_timer(value_analysis=lambda v: f"{len(v[0])} matches")
+log_triangulation=performance_timer(value_analysis=lambda v: f"{len(v)} points")

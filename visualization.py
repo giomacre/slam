@@ -17,9 +17,9 @@ def setup_pangolin(
     focal_length=500,
     z_near=0.1,
     z_far=1000,
-    camera_pos=[0.0, 0.5, -3.0],
+    camera_pos=[0.0, -5, -15],
     target=[0.0] * 3,
-    up_direction=[0.0, -1.0, 0.0],
+    up_direction=[0.0, 1.0, 0.0],
 ):
     pango.CreateWindowAndBind("", width, height)
     gl.glEnable(gl.GL_DEPTH_TEST)
@@ -48,12 +48,12 @@ def setup_pangolin(
     context.display = display
 
 
-def create_map_thread(width, height, thread_context):
+def create_map_thread(windows_size, video_size, thread_context):
     render_context = ddict(
         render_state=None,
         display=None,
     )
-    setup_window = partial(setup_pangolin, width, height, render_context)
+    setup_window = partial(setup_pangolin, *windows_size, render_context)
 
     def draw_cube(
         context,
@@ -68,20 +68,16 @@ def create_map_thread(width, height, thread_context):
         for pose in poses:
             pango.glDrawFrustum(
                 Kinv[:3, :3],
-                width,
-                height,
+                *video_size,
                 np.linalg.inv(pose),
-                0.5,
+                0.1,
             )
         gl.glPointSize(2)
         gl.glColor(1.0, 0.0, 0.0)
         pango.glDrawPoints(points[:, :3])
         pango.FinishFrame()
 
-    decorator = stateful_decorator(
-        keep=1,
-        append_empty=False,
-    )
+    decorator = stateful_decorator(needs=1)
     visualization_loop = decorator(
         partial(
             draw_cube,
