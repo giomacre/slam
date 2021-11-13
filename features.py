@@ -24,7 +24,7 @@ def create_orb_detector():
             (len(frame.key_pts),),
             fill_value=frame.id,
         )
-        frame.tracked_idxs = np.arange(len(frame.key_pts))
+        frame.tracked_idxs = np.empty((len(frame.key_pts),))
         return frame
 
     return orb_detector

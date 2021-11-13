@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from functools import partial
 import sys
 import numpy as np
 from drawing import create_drawer_thread
@@ -20,6 +21,19 @@ from worker import create_thread_context
 
 np.set_printoptions(precision=3, suppress=True)
 
+
+def clean_frame(frame):
+    del (
+        frame.desc,
+        frame.image,
+        frame.points,
+        frame.key_pts,
+        frame.origin_frames,
+        frame.origin_pts,
+        frame.tracked_idxs,
+    )
+
+
 DOWNSCALE = 1
 FX = 525
 FY = FX
@@ -31,8 +45,8 @@ if __name__ == "__main__":
         downscale_factor=DOWNSCALE,
     )
     video_stream = video.get_video_stream()
+    initialize_pose = partial(skip_items, video_stream, take_every=3)
     frames = video_stream
-    frame_skip = skip_items(frames, take_every=3)
     width, height = video.width, video.height
     K = np.array(
         [
@@ -74,13 +88,14 @@ if __name__ == "__main__":
             case (None, *_):
                 continue
             case (*_, 0):
-                frames = skip_items(video_stream, take_every=2)
+                frames = initialize_pose()
                 frame.pose = np.eye(4)
                 frame.points = np.empty((1, 4))
             case (_, 0, _):
-                frames = skip_items(video_stream, take_every=2)
+                frames = initialize_pose()
                 frame.pose = tracked_frames[-1].pose
-                frame.points = tracked_frames[-1].points
+                frame.points = tracked_frames[-1].points.copy()
+                clean_frame(tracked_frames[-1])
             case _:
                 # idx_sort = np.argsort(frame.origin_frames, kind="stable")
                 # sorted = frame.origin_frames[idx_sort]
@@ -108,6 +123,7 @@ if __name__ == "__main__":
                     tracked_frames[-1].pose,
                     matches,
                 )
+                clean_frame(tracked_frames[-1])
         tracked_frames += [frame]
         wait_map = send_map_task(
             (
