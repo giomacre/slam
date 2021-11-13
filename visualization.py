@@ -17,9 +17,9 @@ def setup_pangolin(
     focal_length=500,
     z_near=0.1,
     z_far=1000,
-    camera_pos=[0.0, -5, -15],
-    target=[0.0] * 3,
-    up_direction=[0.0, 1.0, 0.0],
+    camera_pos=[0.0, -1.5, -1.0],
+    target=[0.0, 0.3, 1.0],
+    up_direction=[0.0, -1.0, 0.0],
 ):
     pango.CreateWindowAndBind("", width, height)
     gl.glEnable(gl.GL_DEPTH_TEST)
@@ -63,18 +63,25 @@ def create_map_thread(windows_size, video_size, thread_context):
     ):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         context.display.Activate(context.render_state)
-        gl.glLineWidth(2)
-        gl.glColor(1.0, 1.0, 0.0)
-        for pose in poses:
+        gl.glLineWidth(5)
+        gl.glColor(0.0, 0.0, 1.0)
+        for pose in poses[:-1]:
             pango.glDrawFrustum(
-                Kinv[:3, :3],
+                Kinv,
                 *video_size,
-                np.linalg.inv(pose),
-                0.1,
+                pose,
+                0.3,
             )
+        gl.glColor(0.0, 1.0, 0.0)
+        pango.glDrawFrustum(
+                Kinv,
+                *video_size,
+                poses[-1],
+                0.3,
+        )
         gl.glPointSize(2)
         gl.glColor(1.0, 0.0, 0.0)
-        pango.glDrawPoints(points[:, :3])
+        # pango.glDrawPoints(points[:, :3])
         pango.FinishFrame()
 
     decorator = stateful_decorator(needs=1)
