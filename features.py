@@ -1,5 +1,6 @@
 import cv2 as cv
 import numpy as np
+from decorators import ddict
 from slam_logging import log_feature_match, log_feature_extraction
 
 # Detectors
@@ -8,7 +9,7 @@ from slam_logging import log_feature_match, log_feature_extraction
 def create_orb_detector():
     orb = cv.ORB_create(
         nfeatures=1500,
-        WTA_K=2,
+        WTA_K=4,
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
@@ -16,15 +17,16 @@ def create_orb_detector():
     def orb_detector(frame):
         key_pts = orb.detect(frame.image)
         key_pts, frame.desc = orb.compute(frame.image, key_pts)
-        if frame.desc is None:
-            return frame
-        frame.key_pts = np.array([k.pt for k in key_pts])
-        frame.origin_pts = frame.key_pts.copy()
-        frame.origin_frames = np.full(
-            (len(frame.key_pts),),
-            fill_value=frame.id,
+        # if frame.desc is None:
+        #     return frame
+        pts_returned = (len(key_pts),)
+        key_pts = np.array([k.pt for k in key_pts])
+        frame |= ddict(
+            key_pts=key_pts,
+            origin_pts=key_pts.copy(),
+            origin_frames=np.full(pts_returned, fill_value=frame.id),
+            tracked_idxs=np.empty(pts_returned, dtype=np.int8),
         )
-        frame.tracked_idxs = np.empty((len(frame.key_pts),))
         return frame
 
     return orb_detector
@@ -34,7 +36,7 @@ def create_orb_detector():
 
 
 def create_bruteforce_matcher():
-    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING)
+    cv_matcher = cv.BFMatcher_create(cv.NORM_HAMMING2)
     return create_feature_matcher(
         lambda d1, d2: cv_matcher.knnMatch(d1, d2, k=2),
         ratio_test_filter(),

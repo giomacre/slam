@@ -8,21 +8,22 @@ def create_pose_estimator(K, detector, matcher):
     K = K[:3, :3]
     no_reference = ddict(
         image=None,
-        key_pts=None,
+        key_pts=np.array([]),
         desc=None,
     )
+    print(no_reference)
 
     @log_pose_estimation
     def compute_pose(query_frame, train_frame=no_reference):
-        no_value = []
         query_frame = detector(query_frame)
         matches, query_idxs, train_idxs = matcher(query_frame, train_frame)
         if len(matches) == 0:
-            return no_value
-        R, t, mask = get_pose_from_image_points(K, matches)
-        mask = mask.astype(np.bool).ravel()
+            return 0
+        R, t, *masks = get_pose_from_image_points(K, matches)
+        mask, mask_pose = (m.astype(np.bool).ravel() for m in masks)
+
         if R is None:
-            return no_value
+            return 0
         T = np.vstack(
             (np.hstack((R, t)), [0, 0, 0, 1]),
         )
@@ -32,7 +33,7 @@ def create_pose_estimator(K, detector, matcher):
         query_frame.origin_frames[query_idxs] = train_frame.origin_frames[train_idxs]
         query_frame.origin_pts[query_idxs] = train_frame.origin_pts[train_idxs]
         query_frame.tracked_idxs = query_idxs
-        return matches[mask]
+        return np.sum(mask_pose)
 
     return compute_pose
 
@@ -46,31 +47,36 @@ def get_pose_from_image_points(K, points):
     )
     if E is None:
         return [None] * 3
-    _, R, t, mask = cv.recoverPose(
+    _, R, t, mask_pose = cv.recoverPose(
         E,
         points[..., 0],
         points[..., 1],
         K,
-        mask=mask,
+        mask=mask.copy(),
     )
-    return R, t, mask
+    return R, t, mask, mask_pose
+
 
 def create_point_triangulator(K):
     @log_triangulation
     def triangulation(
         current_pose,
         reference_pose,
-        matches,
+        current_points,
+        reference_points,
     ):
         points_4d = np.array(
             cv.triangulatePoints(
                 (K @ current_pose)[:3],
                 (K @ reference_pose)[:3],
-                matches[..., 0].T,
-                matches[..., 1].T,
+                current_points.T,
+                reference_points.T,
             )
         ).T
+        points_4d = points_4d[points_4d[:, -1] != 0]
         points_4d /= points_4d[:, -1:]
-        return points_4d
+        camera_coordinates = current_pose @ points_4d.T
+        in_front = camera_coordinates[2, :] > 0.0
+        return points_4d[in_front]
 
     return triangulation

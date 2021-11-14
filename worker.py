@@ -54,6 +54,7 @@ def create_worker(
     thread = Thread(
         target=worker_loop,
         args=(queue,),
+        daemon=True,
     )
     thread_context.threads += [thread]
     return register_task

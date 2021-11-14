@@ -48,14 +48,14 @@ def setup_pangolin(
     context.display = display
 
 
-def create_map_thread(windows_size, video_size, thread_context):
+def create_map_thread(windows_size, Kinv, video_size, thread_context):
     render_context = ddict(
         render_state=None,
         display=None,
     )
     setup_window = partial(setup_pangolin, *windows_size, render_context)
 
-    def draw_cube(
+    def draw_map(
         context,
         Kinv,
         poses,
@@ -74,21 +74,22 @@ def create_map_thread(windows_size, video_size, thread_context):
             )
         gl.glColor(0.0, 1.0, 0.0)
         pango.glDrawFrustum(
-                Kinv,
-                *video_size,
-                poses[-1],
-                0.3,
+            Kinv,
+            *video_size,
+            poses[-1],
+            0.3,
         )
         gl.glPointSize(2)
         gl.glColor(1.0, 0.0, 0.0)
-        # pango.glDrawPoints(points[:, :3])
+        pango.glDrawPoints(points)
         pango.FinishFrame()
 
     decorator = stateful_decorator(needs=1)
     visualization_loop = decorator(
         partial(
-            draw_cube,
+            draw_map,
             render_context,
+            Kinv
         )
     )
     return create_worker(

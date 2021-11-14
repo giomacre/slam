@@ -3,7 +3,11 @@ import cv2 as cv
 from decorators import ddict
 
 
-def skip_items(iterator, take_every=2):
+def skip_items(
+    iterator,
+    take_every=2,
+    default_behaviour=lambda _: None,
+):
     def __skip_items__():
         count = 0
         while True:
@@ -14,6 +18,8 @@ def skip_items(iterator, take_every=2):
                 break
             if count % take_every == 0:
                 yield current_value
+            else:
+                default_behaviour(current_value)
 
     return __skip_items__()
 

@@ -33,20 +33,21 @@ def draw_matches(
         cv.circle(
             image_with_matches,
             current_pos,
-            radius=4,
+            radius=5,
             color=(0, 0, 255),
         )
-        cv.circle(
-            image_with_matches,
-            last_pos,
-            radius=2,
-            color=(255, 0, 0),
-        )
+        # cv.circle(
+        #     image_with_matches,
+        #     last_pos,
+        #     radius=3,
+        #     color=(255, 0, 255),
+        # )
         cv.line(
             image_with_matches,
             current_pos,
             last_pos,
-            color=(0, 255, 0),
+            thickness=1,
+            color=(255, 255, 0),
         )
     cv.imshow("", image_with_matches)
     if cv.waitKey(delay=1) == ord("q"):
