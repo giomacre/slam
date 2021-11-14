@@ -13,7 +13,7 @@ def create_orb_detector():
         scoreType=cv.ORB_HARRIS_SCORE,
     )
 
-    @log_feature_extraction
+    # @log_feature_extraction
     def orb_detector(frame):
         key_pts = orb.detect(frame.image)
         key_pts, frame.desc = orb.compute(frame.image, key_pts)
@@ -54,7 +54,7 @@ def ratio_test_filter(thresh_value=0.7):
 
 
 def create_feature_matcher(matcher, match_filter):
-    @log_feature_match
+    # @log_feature_match
     def match_keypoints(query_frame, train_frame):
         no_match = [[]] * 3
         if any(f.desc is None for f in [query_frame, train_frame]):

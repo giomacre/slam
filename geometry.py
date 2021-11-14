@@ -13,7 +13,7 @@ def create_pose_estimator(K, detector, matcher):
     )
     print(no_reference)
 
-    @log_pose_estimation
+    # @log_pose_estimation
     def compute_pose(query_frame, train_frame=no_reference):
         query_frame = detector(query_frame)
         matches, query_idxs, train_idxs = matcher(query_frame, train_frame)
@@ -24,12 +24,12 @@ def create_pose_estimator(K, detector, matcher):
 
         if R is None:
             return 0
-        T = np.vstack(
+        S = np.vstack(
             (np.hstack((R, t)), [0, 0, 0, 1]),
         )
         query_idxs = query_idxs[mask]
         train_idxs = train_idxs[mask]
-        query_frame.pose = T @ train_frame.pose
+        query_frame.pose = S @ train_frame.pose
         query_frame.origin_frames[query_idxs] = train_frame.origin_frames[train_idxs]
         query_frame.origin_pts[query_idxs] = train_frame.origin_pts[train_idxs]
         query_frame.tracked_idxs = query_idxs
@@ -40,8 +40,8 @@ def create_pose_estimator(K, detector, matcher):
 
 def get_pose_from_image_points(K, points):
     E, mask = cv.findEssentialMat(
-        points[..., 0],
         points[..., 1],
+        points[..., 0],
         K,
         threshold=1.0,
     )
@@ -49,34 +49,51 @@ def get_pose_from_image_points(K, points):
         return [None] * 3
     _, R, t, mask_pose = cv.recoverPose(
         E,
-        points[..., 0],
         points[..., 1],
+        points[..., 0],
         K,
         mask=mask.copy(),
     )
-    return R, t, mask, mask_pose
+    return R.T, -R.T @ t, mask, mask_pose
 
 
 def create_point_triangulator(K):
-    @log_triangulation
+    # @log_triangulation
     def triangulation(
         current_pose,
         reference_pose,
         current_points,
         reference_points,
     ):
+        current_extrinsics = to_extrinsics(current_pose)
+        reference_extrinsics = to_extrinsics(reference_pose)
         points_4d = np.array(
             cv.triangulatePoints(
-                (K @ current_pose)[:3],
-                (K @ reference_pose)[:3],
-                current_points.T,
+                (K @ reference_extrinsics)[:3],
+                (K @ current_extrinsics)[:3],
                 reference_points.T,
+                current_points.T,
             )
         ).T
         points_4d = points_4d[points_4d[:, -1] != 0]
         points_4d /= points_4d[:, -1:]
-        camera_coordinates = current_pose @ points_4d.T
+        camera_coordinates = current_extrinsics @ points_4d.T
         in_front = camera_coordinates[2, :] > 0.0
         return points_4d[in_front]
 
     return triangulation
+
+
+def to_extrinsics(camera_pose):
+    world_to_camera = np.vstack(
+        (
+            np.hstack(
+                (
+                    camera_pose[:3, :3].T,
+                    -camera_pose[:3, :3].T @ camera_pose[:3, 3:],
+                )
+            ),
+            [0, 0, 0, 1],
+        ),
+    )
+    return world_to_camera
