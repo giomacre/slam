@@ -36,10 +36,10 @@ def performance_timer(
 
 
 log_pose_estimation = performance_timer(
-    value_analysis=lambda v: f"{v} points passed the cheirality check"
+    value_analysis=lambda v: f", and {v} points passed the cheirality check"
 )
 log_feature_extraction = performance_timer(
-    value_analysis=lambda v: f"{len(v.desc) if v.desc is not None else 0} features"
+    value_analysis=lambda v: f"{len(v.key_pts)} features"
 )
 log_feature_match = performance_timer(value_analysis=lambda v: f"{len(v[0])} matches")
 log_triangulation = performance_timer(value_analysis=lambda v: f"{len(v)} points")

@@ -17,8 +17,8 @@ def setup_pangolin(
     focal_length=500,
     z_near=0.1,
     z_far=1000,
-    camera_pos=[0.0, -1.5, -1.0],
-    target=[0.0, 0.3, 1.0],
+    camera_pos=[15.0, -20.0, -25.0],
+    target=[0.0, 0.5, 0.5],
     up_direction=[0.0, -1.0, 0.0],
 ):
     pango.CreateWindowAndBind("", width, height)
@@ -63,21 +63,29 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
     ):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         context.display.Activate(context.render_state)
-        gl.glLineWidth(5)
-        gl.glColor(0.0, 0.0, 1.0)
+        gl.glColor(1.0, 0.85, 0.3)
         for pose in poses[:-1]:
             pango.glDrawFrustum(
                 Kinv,
                 *video_size,
                 pose,
-                0.3,
+                0.2,
             )
-        gl.glColor(0.0, 1.0, 0.0)
+        pango.glDrawLineStrip(
+            [
+                *map(
+                    lambda p: p[:3, 3:],
+                    poses,
+                )
+            ]
+        )
+        gl.glLineWidth(2)
+        gl.glColor(0.4, 0.0, 1.0)
         pango.glDrawFrustum(
             Kinv,
             *video_size,
             poses[-1],
-            0.3,
+            1,
         )
         gl.glPointSize(2)
         gl.glColor(1.0, 0.0, 0.0)
@@ -89,7 +97,7 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
         partial(
             draw_map,
             render_context,
-            Kinv
+            Kinv,
         )
     )
     return create_worker(

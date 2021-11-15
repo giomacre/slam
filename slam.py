@@ -2,8 +2,10 @@
 
 from functools import partial
 import sys
+import cv2
 import numpy as np
 from drawing import create_drawer_thread
+from optical_flow import create_lk_orb_detector, create_lk_tracker
 from video import (
     Video,
     skip_items,
@@ -67,8 +69,17 @@ if __name__ == "__main__":
     Kinv = np.linalg.inv(K[:3, :3])
     pose_estimator = create_pose_estimator(
         K,
-        create_orb_detector(),
-        create_bruteforce_matcher(),
+        # create_bruteforce_matcher(
+        #     create_orb_detector(nfeatures=1000),
+        #     normType=cv2.NORM_HAMMING,
+        # ),
+        create_lk_tracker(
+            create_lk_orb_detector(
+                nfeatures=200,
+                scoreType=cv2.ORB_FAST_SCORE,
+            ),
+            min_points=500,
+        ),
     )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
@@ -96,12 +107,12 @@ if __name__ == "__main__":
         )
         wait_draw = send_draw_task((frame.image, pts))
         context = (
-            frame.desc,
+            len(frame.key_pts),
             good_points,
             len(tracked_frames),
         )
         match context:
-            case (None, *_):
+            case (0, *_):
                 continue
             case (*_, 0):
                 frames = initialize_pose()
@@ -110,7 +121,6 @@ if __name__ == "__main__":
             case (_, 0, _):
                 frames = initialize_pose()
                 continue
-                # clean_frame(tracked_frames[-1])
             case _:
                 candidates = frame.origin_frames < frame.id
                 idx_sort = np.argsort(frame.origin_frames[candidates], kind="stable")
