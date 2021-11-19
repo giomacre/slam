@@ -40,6 +40,8 @@ DOWNSCALE = 1
 FX = 525
 FY = FX
 
+count = []
+
 if __name__ == "__main__":
     video_path = sys.argv[1]
     video = Video(
@@ -75,10 +77,10 @@ if __name__ == "__main__":
         # ),
         create_lk_tracker(
             create_lk_orb_detector(
-                nfeatures=200,
+                nfeatures=500,
                 scoreType=cv2.ORB_FAST_SCORE,
             ),
-            min_points=500,
+            min_points = 1000,
         ),
     )
     triangulation = create_point_triangulator(K)
@@ -122,22 +124,47 @@ if __name__ == "__main__":
                 frames = initialize_pose()
                 continue
             case _:
-                candidates = frame.origin_frames < frame.id
+                candidates = frame.id - frame.origin_frames > 1
                 idx_sort = np.argsort(frame.origin_frames[candidates], kind="stable")
                 sorted = frame.origin_frames[candidates][idx_sort]
                 frame_ids, idx_first_occurences = np.unique(sorted, return_index=True)
+                position = lambda f: f.pose[:3, 3]
+                selected = np.fromiter(
+                    (
+                        (
+                            (
+                                d := np.linalg.norm(
+                                    position(tracked_frames[i]) - position(frame)
+                                )
+                            )
+                            > 1.25
+                            and d < 12.5
+                            for i in frame_ids
+                        )
+                    ),
+                    np.bool8,
+                )
+                good_refs = np.isin(
+                    frame.origin_frames[candidates],
+                    frame_ids[selected],
+                )
                 frame.points = []
                 for origin_frame, (current_pts, origin_pts) in zip(
                     map(
                         lambda id: tracked_frames[id],
-                        frame_ids,
+                        frame_ids[selected],
                     ),
                     map(
                         lambda i: (
                             frame.key_pts[candidates][i],
                             frame.origin_pts[candidates][i],
                         ),
-                        np.split(idx_sort, idx_first_occurences[1:]),
+                        np.array(
+                            np.split(
+                                idx_sort,
+                                idx_first_occurences[1:],
+                            )
+                        )[selected],
                     ),
                 ):
                     triangulated = triangulation(

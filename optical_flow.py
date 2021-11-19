@@ -49,8 +49,8 @@ def track_to_new_frame(query_frame, train_frame):
         tracked_points,
         None,
     )
-    good_trackings = np.abs(tracked_reversed - train_pts).max(axis=2) < 1
-    good_trackings = good_trackings.ravel()
+    good_tracks = np.abs(tracked_reversed - train_pts).max(axis=2) < 1
+    good_tracks = good_tracks.ravel()
     return (
         np.dstack(
             (
@@ -58,7 +58,7 @@ def track_to_new_frame(query_frame, train_frame):
                 train_pts.reshape(-1, 2),
             )
         ),
-        good_trackings,
+        good_tracks,
     )
 
 
@@ -69,24 +69,24 @@ def create_lk_tracker(detector, min_points=600):
             detector(query_frame)
             return [[]] * 3
 
-        trackings, good_trackings = track_to_new_frame(
+        tracks, good = track_to_new_frame(
             query_frame,
             train_frame,
         )
-        num_tracked = np.count_nonzero(good_trackings)
-        if num_tracked < min_points:
+        num_tracked = np.count_nonzero(good)
+        if num_tracked <  min_points:
             query_frame = detector(
                 query_frame,
-                trackings[good_trackings, ..., 0],
+                tracks[good, ..., 0],
             )
             query_frame.key_pts = np.vstack(
                 (
-                    trackings[good_trackings, ..., 0],
+                    tracks[good, ..., 0],
                     query_frame.key_pts,
                 )
             )
         else:
-            query_frame.key_pts = trackings[good_trackings, ..., 0]
+            query_frame.key_pts = tracks[good, ..., 0]
         query_frame.desc = None
         query_frame.origin_frames = np.full(
             len(query_frame.key_pts),
@@ -94,11 +94,11 @@ def create_lk_tracker(detector, min_points=600):
         )
         query_frame.origin_pts = query_frame.key_pts.copy()
         query_idxs = np.arange(num_tracked)
-        train_idxs = np.nonzero(good_trackings)
+        train_idxs = np.flatnonzero(good)
         return (
-            trackings[good_trackings],
+            tracks[good],
             query_idxs,
-            *train_idxs,
+            train_idxs,
         )
 
     return tracker
