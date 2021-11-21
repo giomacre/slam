@@ -1,3 +1,6 @@
 [submodule "external/ceres-solver"]
 	path = external/ceres-solver
 	url = https://github.com/ceres-solver/ceres-solver.git
+[submodule "external/Pangolin"]
+	path = external/Pangolin
+	url = https://github.com/giomacre/Pangolin/
