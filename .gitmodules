@@ -4,3 +4,6 @@
 [submodule "external/Pangolin"]
 	path = external/Pangolin
 	url = https://github.com/giomacre/Pangolin/
+[submodule "external/Sophus"]
+	path = external/Sophus
+	url = https://github.com/strasdat/Sophus.git
