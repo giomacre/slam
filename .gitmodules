@@ -1,9 +1,9 @@
 [submodule "external/ceres-solver"]
 	path = external/ceres-solver
-	url = https://github.com/ceres-solver/ceres-solver.git
+	url = https://github.com/giomacre/ceres-solver
 [submodule "external/Pangolin"]
 	path = external/Pangolin
-	url = https://github.com/giomacre/Pangolin/
+	url = https://github.com/giomacre/Pangolin
 [submodule "external/Sophus"]
 	path = external/Sophus
-	url = https://github.com/strasdat/Sophus.git
+	url = https://github.com/giomacre/Sophus
