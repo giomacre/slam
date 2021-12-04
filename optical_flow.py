@@ -7,7 +7,7 @@ from slam_logging import log_feature_match
 def create_lk_orb_detector(**orb_args):
     orb = create_orb_detector(compute_descriptors=False, **orb_args)
 
-    def detector(query_frame, tracked_points=None):
+    def detector(query_frame, max_features=None, tracked_points=None):
         mask_trackings = None
         if tracked_points is not None:
             mask_trackings = np.full_like(
@@ -23,7 +23,11 @@ def create_lk_orb_detector(**orb_args):
                     0,
                     thickness=cv.FILLED,
                 )
-        return orb(query_frame, mask_trackings)
+        return orb(
+            query_frame,
+            max_features,
+            mask_trackings,
+        )
 
     return detector
 
@@ -66,27 +70,32 @@ def create_lk_tracker(detector, min_points=600):
     @log_feature_match
     def tracker(query_frame, train_frame):
         if len(train_frame.key_pts) == 0:
-            detector(query_frame)
+            detector(
+                query_frame,
+                max_features=min_points,
+            )
             return [[]] * 3
 
-        tracks, good = track_to_new_frame(
+        tracked, good = track_to_new_frame(
             query_frame,
             train_frame,
         )
         num_tracked = np.count_nonzero(good)
-        if num_tracked <  min_points:
+        current_pts = tracked[good, ..., 0]
+        if num_tracked < min_points:
             query_frame = detector(
                 query_frame,
-                tracks[good, ..., 0],
+                min_points - num_tracked,
+                current_pts,
             )
-            query_frame.key_pts = np.vstack(
-                (
-                    tracks[good, ..., 0],
-                    query_frame.key_pts,
+            if len(query_frame.key_pts) > 0:
+                current_pts = np.vstack(
+                    [
+                        current_pts,
+                        query_frame.key_pts,
+                    ]
                 )
-            )
-        else:
-            query_frame.key_pts = tracks[good, ..., 0]
+        query_frame.key_pts = current_pts
         query_frame.desc = None
         query_frame.origin_frames = np.full(
             len(query_frame.key_pts),
@@ -96,7 +105,7 @@ def create_lk_tracker(detector, min_points=600):
         query_idxs = np.arange(num_tracked)
         train_idxs = np.flatnonzero(good)
         return (
-            tracks[good],
+            tracked[good],
             query_idxs,
             train_idxs,
         )

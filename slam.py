@@ -77,10 +77,9 @@ if __name__ == "__main__":
         # ),
         create_lk_tracker(
             create_lk_orb_detector(
-                nfeatures=500,
                 scoreType=cv2.ORB_FAST_SCORE,
             ),
-            min_points = 1000,
+            min_points = 1500,
         ),
     )
     triangulation = create_point_triangulator(K)
@@ -178,6 +177,7 @@ if __name__ == "__main__":
                         if len(frame.points) == 0
                         else np.vstack((frame.points, triangulated))
                     )
+                print(dir(frame))
                 clean_frame(tracked_frames[-1])
                 frames = video_stream
         tracked_frames += [frame]

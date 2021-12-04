@@ -10,7 +10,9 @@ def create_orb_detector(compute_descriptors=True, **orb_args):
     orb = cv.ORB_create(**orb_args)
 
     @log_feature_extraction
-    def orb_detector(frame, mask=None):
+    def orb_detector(frame, max_features=None, mask=None):
+        if max_features is not None:
+            orb.setMaxFeatures(max_features)
         key_pts = orb.detect(frame.image, mask=mask)
         desc = None
         if compute_descriptors:

@@ -1,6 +1,5 @@
 from functools import partial
 import cv2 as cv
-from matplotlib.pyplot import draw
 from decorators import stateful_decorator
 
 from worker import create_worker

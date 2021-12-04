@@ -17,7 +17,7 @@ def create_pose_estimator(K, matcher):
         matches, query_idxs, train_idxs = matcher(query_frame, train_frame)
         if len(matches) == 0:
             return 0
-        R, t, *masks = get_pose_from_image_points(K, matches)
+        R, t, *masks = get_relative_transform(K, matches)
         mask, mask_pose = (m.astype(np.bool).ravel() for m in masks)
         if R is None:
             return 0
@@ -35,7 +35,7 @@ def create_pose_estimator(K, matcher):
     return compute_pose
 
 
-def get_pose_from_image_points(K, points):
+def get_relative_transform(K, points):
     E, mask = cv.findEssentialMat(
         points[..., 1],
         points[..., 0],
@@ -51,7 +51,9 @@ def get_pose_from_image_points(K, points):
         K,
         mask=mask.copy(),
     )
-    return R.T, -R.T @ t, mask, mask_pose
+    R = R.T
+    t = -R @ t
+    return R, t, mask, mask_pose
 
 
 def create_point_triangulator(K):
