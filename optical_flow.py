@@ -66,13 +66,17 @@ def track_to_new_frame(query_frame, train_frame):
     )
 
 
-def create_lk_tracker(detector, min_points=600):
-    @log_feature_match
+def create_lk_tracker(
+    detector,
+    min_points=500,
+    max_points=1000,
+):
+    # @log_feature_match
     def tracker(query_frame, train_frame):
         if len(train_frame.key_pts) == 0:
             detector(
                 query_frame,
-                max_features=min_points,
+                max_features=max_points,
             )
             return [[]] * 3
 
@@ -85,7 +89,7 @@ def create_lk_tracker(detector, min_points=600):
         if num_tracked < min_points:
             query_frame = detector(
                 query_frame,
-                min_points - num_tracked,
+                max_points - num_tracked,
                 current_pts,
             )
             if len(query_frame.key_pts) > 0:
@@ -97,11 +101,6 @@ def create_lk_tracker(detector, min_points=600):
                 )
         query_frame.key_pts = current_pts
         query_frame.desc = None
-        query_frame.origin_frames = np.full(
-            len(query_frame.key_pts),
-            query_frame.id,
-        )
-        query_frame.origin_pts = query_frame.key_pts.copy()
         query_idxs = np.arange(num_tracked)
         train_idxs = np.flatnonzero(good)
         return (

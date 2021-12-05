@@ -11,26 +11,24 @@ def create_pose_estimator(K, matcher):
         key_pts=np.array([]),
         desc=None,
     )
+    no_pose = [[]] * 2
 
     # @log_pose_estimation
     def compute_pose(query_frame, train_frame=no_reference):
         matches, query_idxs, train_idxs = matcher(query_frame, train_frame)
         if len(matches) == 0:
-            return 0
-        R, t, *masks = get_relative_transform(K, matches)
-        mask, mask_pose = (m.astype(np.bool).ravel() for m in masks)
+            return no_pose
+        R, t, mask = get_relative_transform(K, matches)
         if R is None:
-            return 0
+            return no_pose
+        mask = mask.astype(np.bool).ravel()
         S = np.vstack(
             (np.hstack((R, t)), [0, 0, 0, 1]),
         )
+        query_frame.pose = S @ train_frame.pose
         query_idxs = query_idxs[mask]
         train_idxs = train_idxs[mask]
-        query_frame.pose = S @ train_frame.pose
-        query_frame.origin_frames[query_idxs] = train_frame.origin_frames[train_idxs]
-        query_frame.origin_pts[query_idxs] = train_frame.origin_pts[train_idxs]
-        query_frame.tracked_idxs = query_idxs
-        return np.sum(mask_pose)
+        return query_idxs, train_idxs
 
     return compute_pose
 
@@ -51,9 +49,11 @@ def get_relative_transform(K, points):
         K,
         mask=mask.copy(),
     )
+    if np.sum(mask_pose) == 0:
+        return [None] * 3
     R = R.T
     t = -R @ t
-    return R, t, mask, mask_pose
+    return R, t, mask
 
 
 def create_point_triangulator(K):

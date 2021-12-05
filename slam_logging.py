@@ -1,7 +1,7 @@
 from collections import deque
 from functools import partial, wraps
 from numpy import mean
-from decorators import ddict, use_arguments
+from decorators import use_arguments
 
 
 @use_arguments

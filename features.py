@@ -9,7 +9,7 @@ from slam_logging import log_feature_match, log_feature_extraction
 def create_orb_detector(compute_descriptors=True, **orb_args):
     orb = cv.ORB_create(**orb_args)
 
-    @log_feature_extraction
+    # @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
@@ -18,13 +18,9 @@ def create_orb_detector(compute_descriptors=True, **orb_args):
         if compute_descriptors:
             key_pts, desc = orb.compute(frame.image, key_pts)
         key_pts = np.array([k.pt for k in key_pts])
-        pts_returned = (len(key_pts),)
         frame |= ddict(
             key_pts=key_pts,
             desc=desc,
-            origin_pts=key_pts.copy(),
-            origin_frames=np.full(pts_returned, fill_value=frame.id),
-            tracked_idxs=np.full(pts_returned, fill_value=True),
         )
         return frame
 
@@ -69,12 +65,15 @@ def create_feature_matcher(detector, matcher, match_filter):
         )
         if len(indices) == 0:
             return no_match
-        query_idxs, train_idxs = indices[:, 0], indices[:, 1]
-        query_pts, train_pts = query_frame.key_pts, train_frame.key_pts
-        query_matches = query_pts[query_idxs]
-        train_matches = train_pts[train_idxs]
+        query_idxs = indices[:, 0]
+        train_idxs = indices[:, 1]
         return (
-            np.dstack((query_matches, train_matches)),
+            np.dstack(
+                [
+                    query_frame.key_pts[query_idxs],
+                    train_frame.key_pts[train_idxs],
+                ]
+            ),
             query_idxs,
             train_idxs,
         )

@@ -5,7 +5,7 @@ from functools import reduce, wraps
 class ddict(dict):
     __getattr__ = (
         lambda *args: item
-        if type(item := dict.__getitem__(*args)) is not dict
+        if type(item := dict.get(*args)) is not dict
         else ddict(item)
     )
     __setattr__ = dict.__setitem__
