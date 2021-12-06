@@ -1,3 +1,4 @@
+from concurrent.futures import thread
 from functools import partial
 from time import sleep
 import cv2 as cv
@@ -7,39 +8,50 @@ from decorators import stateful_decorator
 from worker import create_worker
 
 
-def create_drawer_thread(thread_context):
+def create_drawer_thread(
+    thread_context,
+    n_segments=5,
+):
     decorator = stateful_decorator(needs=1)
     draw_loop = decorator(
         partial(
             draw_matches,
-            thread_context.close,
+            thread_context.close_context,
         )
     )
     worker = create_worker(
         draw_loop,
         thread_context,
+        name="ImageViewer",
     )
 
-    def draw_task(frame):
-        n_segments = 5
+    def draw_task(frames):
         observations = []
-        for obs in frame.observations:
+        for obs in frames[-1].observations:
             n_points = n_segments + 1 if (n := len(obs.frames)) > n_segments else n
             observations += [(obs.frames[-n_points:], obs.idxs[-n_points:])]
-        return worker((frame.image, observations))
+        return worker(
+            (
+                frames[-1].image,
+                [
+                    np.array(
+                        [
+                            frames[f_id].key_pts[p_id]
+                            for f_id, p_id in zip(f_ids, p_ids)
+                        ],
+                        dtype=np.int32,
+                    )
+                    for f_ids, p_ids in observations
+                ],
+            )
+        )
 
     return draw_task
 
 
 def draw_matches(on_quit, image, observations):
-    to_int = lambda x: np.round(x).astype(np.int32)
     image_with_matches = image
-    for frames, idxs in observations:
-        pts = np.array(
-            [to_int(f.key_pts[idx]) for f, idx in zip(frames, idxs)],
-            dtype=np.int32,
-        )
-
+    for pts in observations:
         if len(pts) > 1:
             cv.polylines(
                 image_with_matches,

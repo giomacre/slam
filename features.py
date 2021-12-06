@@ -9,7 +9,7 @@ from slam_logging import log_feature_match, log_feature_extraction
 def create_orb_detector(compute_descriptors=True, **orb_args):
     orb = cv.ORB_create(**orb_args)
 
-    # @log_feature_extraction
+    @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)

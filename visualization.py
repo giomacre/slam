@@ -104,4 +104,5 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
         visualization_loop,
         thread_context,
         one_shot=setup_window,
+        name="PyPangolinViewer",
     )

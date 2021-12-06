@@ -2,6 +2,7 @@
 
 from functools import partial, reduce
 import sys
+from time import sleep
 import cv2
 import numpy as np
 from decorators import ddict
@@ -21,6 +22,7 @@ from geometry import (
 )
 from visualization import create_map_thread
 from worker import create_thread_context
+from threading import current_thread
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     width, height = video.width, video.height
 
     thread_context = create_thread_context()
-    send_draw_task = create_drawer_thread(thread_context)
+    send_draw_task = create_drawer_thread(thread_context, n_segments=10)
 
     video_stream = video.get_video_stream()
     initialize_pose = partial(
@@ -79,14 +81,13 @@ if __name__ == "__main__":
         (width, height),
         thread_context,
     )
-    for worker in thread_context.threads:
-        worker.start()
+    thread_context.start()
 
     frames = video_stream
     tracked_frames = []
     for frame in frames:
         frame.id = len(tracked_frames)
-        if len(tracked_frames) == 0:
+        if frame.id == 0:
             query_idxs, _ = pose_estimator(frame)
         else:
             query_idxs, train_idxs = pose_estimator(
@@ -106,7 +107,7 @@ if __name__ == "__main__":
                 frame.pose = np.eye(4)
                 frame.observations = [
                     ddict(
-                        frames=[frame],
+                        frames=[frame.id],
                         idxs=[i],
                     )
                     for i in range(len(frame.key_pts))
@@ -117,29 +118,31 @@ if __name__ == "__main__":
             case _:
                 frame.observations = [
                     ddict(
-                        frames=[frame],
+                        frames=[frame.id],
                         idxs=[i],
                     )
                     for i in range(len(frame.key_pts))
                 ]
                 for i in range(len(query_idxs)):
                     landmark = tracked_frames[-1].observations[train_idxs[i]]
-                    landmark.frames += [frame]
+                    landmark.frames += [frame.id]
                     landmark.idxs += [query_idxs[i]]
                     frame.observations[query_idxs[i]] = landmark
                 frames = video_stream
         tracked_frames += [frame]
-        wait_draw = send_draw_task(frame)
+        wait_draw = send_draw_task(tracked_frames)
         wait_map = send_map_task(
             (
                 [frame.pose for frame in tracked_frames],
                 [],
             )
         )
-        if thread_context.terminated():
+        wait_draw()
+        wait_map()
+        if thread_context.is_closed:
             break
-        # wait_draw()
-        # wait_map()
-
-for thread in thread_context.threads:
-    thread.join()
+    while not thread_context.is_closed:
+        sleep(0.015)
+    thread_context.terminate_all()
+    thread_context.join_all()
+    print(f"{current_thread()} exiting.")

@@ -5,12 +5,18 @@ from functools import reduce, wraps
 class ddict(dict):
     __getattr__ = (
         lambda *args: item
-        if type(item := dict.get(*args)) is not dict
+        if type(item := dict.__getitem__(*args)) is not dict
         else ddict(item)
     )
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
     __dir__ = dict.keys
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate__(self, dict):
+        self.__dict__ = dict
 
 
 def use_arguments(decorator):
@@ -21,6 +27,27 @@ def use_arguments(decorator):
         return with_parameters
 
     return pass_parameters
+
+def handle_generator(
+    generator_factory,
+    *_,
+    exception,
+    handler,
+):
+    @wraps(generator_factory)
+    def handle_exceptions(*args, **kwargs):
+        generator = generator_factory(*args, **kwargs)
+        while True:
+            try:
+                yield next(generator)
+            except StopIteration:
+                break
+            except exception as e:
+                handler(e)
+
+        pass
+
+    return handle_exceptions
 
 
 @use_arguments

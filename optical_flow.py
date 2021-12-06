@@ -71,7 +71,7 @@ def create_lk_tracker(
     min_points=500,
     max_points=1000,
 ):
-    # @log_feature_match
+    @log_feature_match
     def tracker(query_frame, train_frame):
         if len(train_frame.key_pts) == 0:
             detector(
