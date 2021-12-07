@@ -1,4 +1,5 @@
 from functools import partial
+from multiprocessing.dummy import Condition
 from queue import Empty, Queue
 from threading import Thread, current_thread
 from decorators import handle_generator
@@ -6,6 +7,7 @@ from decorators import handle_generator
 
 class ThreadContext:
     def __init__(self):
+        self.__close_cond__ = Condition()
         self.__is_closed__ = False
         self.__threads__ = []
 
@@ -17,13 +19,20 @@ class ThreadContext:
         self.__threads__ += [(thread, signal)]
 
     def close_context(self):
-        self.__is_closed__ = True
+        with self.__close_cond__:
+            self.__is_closed__ = True
+            self.__close_cond__.notify_all()
 
     def start(self):
         for (thread, _) in self.__threads__:
             thread.start()
 
-    def terminate_all(self):
+    def wait_close(self):
+        with self.__close_cond__:
+            while not self.is_closed:
+                self.__close_cond__.wait()
+
+    def cleanup(self):
         for (_, close_signal) in self.__threads__:
             close_signal()
 

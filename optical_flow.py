@@ -1,5 +1,6 @@
 import cv2 as cv
 import numpy as np
+from decorators import ddict
 from features import create_orb_detector
 from slam_logging import log_feature_match
 
@@ -100,6 +101,13 @@ def create_lk_tracker(
                     ]
                 )
         query_frame.key_pts = current_pts
+        query_frame.observations = [
+            ddict(
+                frames=[query_frame.id],
+                idxs=[i],
+            )
+            for i in range(len(query_frame.key_pts))
+        ]
         query_frame.desc = None
         query_idxs = np.arange(num_tracked)
         train_idxs = np.flatnonzero(good)

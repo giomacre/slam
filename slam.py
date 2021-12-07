@@ -105,24 +105,10 @@ if __name__ == "__main__":
             case (*_, 0):
                 frames = initialize_pose()
                 frame.pose = np.eye(4)
-                frame.observations = [
-                    ddict(
-                        frames=[frame.id],
-                        idxs=[i],
-                    )
-                    for i in range(len(frame.key_pts))
-                ]
             case (_, 0, _):
                 frames = initialize_pose()
                 continue
             case _:
-                frame.observations = [
-                    ddict(
-                        frames=[frame.id],
-                        idxs=[i],
-                    )
-                    for i in range(len(frame.key_pts))
-                ]
                 for i in range(len(query_idxs)):
                     landmark = tracked_frames[-1].observations[train_idxs[i]]
                     landmark.frames += [frame.id]
@@ -141,8 +127,7 @@ if __name__ == "__main__":
         wait_map()
         if thread_context.is_closed:
             break
-    while not thread_context.is_closed:
-        sleep(0.015)
-    thread_context.terminate_all()
+    thread_context.wait_close()
+    thread_context.cleanup()
     thread_context.join_all()
     print(f"{current_thread()} exiting.")

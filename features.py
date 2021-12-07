@@ -21,6 +21,13 @@ def create_orb_detector(compute_descriptors=True, **orb_args):
         frame |= ddict(
             key_pts=key_pts,
             desc=desc,
+            observations=[
+                ddict(
+                    frames=[frame.id],
+                    idxs=[i],
+                )
+                for i in range(len(key_pts))
+            ],
         )
         return frame
 
