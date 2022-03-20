@@ -14,21 +14,16 @@ def create_orb_detector(compute_descriptors=True, **orb_args):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
         key_pts = orb.detect(frame.image, mask=mask)
-        desc = None
         if compute_descriptors:
-            key_pts, desc = orb.compute(frame.image, key_pts)
-        key_pts = np.array([k.pt for k in key_pts])
-        frame |= ddict(
-            key_pts=key_pts,
-            desc=desc,
-            observations=[
-                ddict(
-                    frames=[frame.id],
-                    idxs=[i],
-                )
-                for i in range(len(key_pts))
-            ],
-        )
+            key_pts, frame.desc = orb.compute(frame.image, key_pts)
+        frame.key_pts = np.array([k.pt for k in key_pts])
+        frame.observations = [
+            ddict(
+                frames=[frame.id],
+                idxs=[i],
+            )
+            for i in range(len(key_pts))
+        ]
         return frame
 
     return orb_detector

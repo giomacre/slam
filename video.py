@@ -1,6 +1,7 @@
 from functools import wraps
 import cv2 as cv
 from decorators import ddict
+from frame import create_frame
 
 
 def skip_items(
@@ -11,15 +12,15 @@ def skip_items(
     def __skip_items__():
         count = 0
         while True:
-            count += 1
             try:
                 current_value = next(iterator)
             except StopIteration:
                 break
-            if count % take_every == 0:
+            if count == 0 or count % take_every == 0:
                 yield current_value
             else:
                 default_behaviour(current_value)
+            count += 1
 
     return __skip_items__()
 
@@ -58,7 +59,7 @@ class Video:
                     (self.width, self.height),
                     interpolation=cv.INTER_AREA,
                 )
-            yield ddict(image=frame)
+            yield create_frame(frame)
         self.release()
 
     def release(self):

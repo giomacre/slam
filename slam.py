@@ -31,7 +31,8 @@ DOWNSCALE = 1
 FX = 525
 FY = FX
 
-count = []
+N_FEATURES = 350
+KEYFRAME_THRESHOLD = 0.75
 
 if __name__ == "__main__":
     video_path = sys.argv[1]
@@ -60,19 +61,12 @@ if __name__ == "__main__":
         ]
     )
     Kinv = np.linalg.inv(K[:3, :3])
+    detector = create_lk_orb_detector(
+        scoreType=cv2.ORB_FAST_SCORE,
+    )
     pose_estimator = create_pose_estimator(
         K,
-        # create_bruteforce_matcher(
-        #     create_orb_detector(nfeatures=1000),
-        #     normType=cv2.NORM_HAMMING,
-        # ),
-        create_lk_tracker(
-            create_lk_orb_detector(
-                scoreType=cv2.ORB_FAST_SCORE,
-            ),
-            min_points=1500,
-            max_points=2000,
-        ),
+        create_lk_tracker(),
     )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
@@ -85,36 +79,72 @@ if __name__ == "__main__":
 
     frames = video_stream
     tracked_frames = []
+    last_keyframe = None
     for frame in frames:
         frame.id = len(tracked_frames)
         if frame.id == 0:
-            query_idxs, _ = pose_estimator(frame)
+            frame = detector(frame, N_FEATURES)
+            if len(frame.key_pts) == 0:
+                continue
+            frame.pose = np.eye(4)
+            frame.is_keyframe = True
+            last_keyframe = frame
         else:
             query_idxs, train_idxs = pose_estimator(
                 frame,
                 tracked_frames[-1],
             )
-        context = (
-            len(frame.key_pts),
-            len(query_idxs),
-            len(tracked_frames),
-        )
-        match context:
-            case (0, *_):
+            num_tracked = len(query_idxs)
+            if num_tracked == 0:
                 continue
-            case (*_, 0):
-                frames = initialize_pose()
-                frame.pose = np.eye(4)
-            case (_, 0, _):
-                frames = initialize_pose()
-                continue
-            case _:
-                for i in range(len(query_idxs)):
-                    landmark = tracked_frames[-1].observations[train_idxs[i]]
-                    landmark.frames += [frame.id]
-                    landmark.idxs += [query_idxs[i]]
-                    frame.observations[query_idxs[i]] = landmark
-                frames = video_stream
+            frame.observations = [None] * num_tracked
+            for i in range(len(query_idxs)):
+                landmark = tracked_frames[-1].observations[train_idxs[i]]
+                landmark.frames += [frame.id]
+                landmark.idxs += [i]
+                frame.observations[i] = landmark
+            current_pts = frame.key_pts[query_idxs]
+            current_obs = frame.observations
+            if (
+                len(
+                    [
+                        x
+                        for x in frame.observations
+                        if np.isin(
+                            last_keyframe.id,
+                            x.frames,
+                        )
+                    ]
+                )
+                / len(last_keyframe.observations)
+                < KEYFRAME_THRESHOLD
+            ):
+                frame.is_keyframe = True
+                last_keyframe = frame
+                frame = detector(
+                    frame,
+                    N_FEATURES - num_tracked,
+                    current_pts,
+                )
+                if len(frame.key_pts) > 0:
+                    current_pts = np.vstack(
+                        [
+                            current_pts,
+                            frame.key_pts,
+                        ]
+                    )
+                    current_obs = [
+                        *current_obs,
+                        *[
+                            ddict(frames=[frame.id], idxs=[i])
+                            for i in range(
+                                num_tracked,
+                                num_tracked + len(frame.key_pts),
+                            )
+                        ],
+                    ]
+            frame.key_pts = current_pts
+            frame.observations = current_obs
         tracked_frames += [frame]
         wait_draw = send_draw_task(tracked_frames)
         wait_map = send_map_task(

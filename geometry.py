@@ -6,16 +6,14 @@ from slam_logging import log_pose_estimation, log_triangulation
 
 def create_pose_estimator(K, matcher):
     K = K[:3, :3]
-    no_reference = ddict(
-        image=None,
-        key_pts=np.array([]),
-        desc=None,
-    )
     no_pose = [[]] * 2
 
     # @log_pose_estimation
-    def compute_pose(query_frame, train_frame=no_reference):
-        matches, query_idxs, train_idxs = matcher(query_frame, train_frame)
+    def compute_pose(query_frame, train_frame):
+        matches, query_idxs, train_idxs = matcher(
+            query_frame,
+            train_frame,
+        )
         if len(matches) == 0:
             return no_pose
         R, t, mask = get_relative_transform(K, matches)
