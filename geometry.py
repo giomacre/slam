@@ -4,18 +4,12 @@ from decorators import ddict
 from slam_logging import log_pose_estimation, log_triangulation
 
 
-def create_pose_estimator(K, matcher):
+def create_pose_estimator(K):
     K = K[:3, :3]
-    no_pose = [[]] * 2
+    no_pose = [None] * 2
 
     # @log_pose_estimation
-    def compute_pose(query_frame, train_frame):
-        matches, query_idxs, train_idxs = matcher(
-            query_frame,
-            train_frame,
-        )
-        if len(matches) == 0:
-            return no_pose
+    def compute_pose(matches):
         R, t, mask = get_relative_transform(K, matches)
         if R is None:
             return no_pose
@@ -23,10 +17,7 @@ def create_pose_estimator(K, matcher):
         S = np.vstack(
             (np.hstack((R, t)), [0, 0, 0, 1]),
         )
-        query_frame.pose = S @ train_frame.pose
-        query_idxs = query_idxs[mask]
-        train_idxs = train_idxs[mask]
-        return query_idxs, train_idxs
+        return S, mask
 
     return compute_pose
 

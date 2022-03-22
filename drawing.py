@@ -27,9 +27,10 @@ def create_drawer_thread(
 
     def draw_task(frames):
         observations = []
-        for obs in frames[-1].observations:
-            n_points = n_segments + 1 if (n := len(obs.frames)) > n_segments else n
-            observations += [(obs.frames[-n_points:], obs.idxs[-n_points:])]
+        for pt in frames[-1].observations:
+            n_points = n_segments + 1 if (n := len(pt.idxs)) > n_segments else n
+            last_n = [*sorted(pt.idxs.items(), key=lambda v: v[0])][-n_points:]
+            observations += [last_n]
         return worker(
             (
                 frames[-1].image,
@@ -37,11 +38,11 @@ def create_drawer_thread(
                     np.array(
                         [
                             frames[f_id].key_pts[p_id]
-                            for f_id, p_id in zip(f_ids, p_ids)
+                            for f_id, p_id in obs
                         ],
                         dtype=np.int32,
                     )
-                    for f_ids, p_ids in observations
+                    for obs in observations
                 ],
             )
         )

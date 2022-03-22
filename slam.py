@@ -64,10 +64,8 @@ if __name__ == "__main__":
     detector = create_lk_orb_detector(
         scoreType=cv2.ORB_FAST_SCORE,
     )
-    pose_estimator = create_pose_estimator(
-        K,
-        create_lk_tracker(),
-    )
+    tracker = create_lk_tracker()
+    pose_estimator = create_pose_estimator(K)
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
         (1280, 720),
@@ -90,35 +88,51 @@ if __name__ == "__main__":
             frame.is_keyframe = True
             last_keyframe = frame
         else:
-            query_idxs, train_idxs = pose_estimator(
+
+            matches, query_idxs, train_idxs = tracker(
                 frame,
                 tracked_frames[-1],
             )
-            num_tracked = len(query_idxs)
-            if num_tracked == 0:
+            if len(matches) == 0:
                 continue
-            frame.observations = [None] * num_tracked
-            for i in range(len(query_idxs)):
-                landmark = tracked_frames[-1].observations[train_idxs[i]]
-                landmark.frames += [frame.id]
-                landmark.idxs += [i]
-                frame.observations[i] = landmark
-            current_pts = frame.key_pts[query_idxs]
-            current_obs = frame.observations
-            if (
-                len(
-                    [
-                        x
-                        for x in frame.observations
-                        if np.isin(
-                            last_keyframe.id,
-                            x.frames,
-                        )
-                    ]
+            # Use last frame to update the pose
+            # S, inliers = pose_estimator(matches)
+            # if S is None:
+            #     continue
+            # num_tracked = sum(inliers)
+            # frame.pose = S @ tracked_frames[-1].pose
+            # train_idxs = train_idxs[inliers]
+            frame.key_pts = matches[..., 0]
+            # Use Keyframe to update the pose
+            kf_idxs = np.array(
+                [
+                    tracked_frames[-1].observations[i].idxs[last_keyframe.id]
+                    for i in train_idxs
+                ]
+            )
+            S, inliers = pose_estimator(
+                np.dstack(
+                    (
+                        frame.key_pts,
+                        last_keyframe.key_pts[
+                            kf_idxs,
+                        ],
+                    )
                 )
-                / len(last_keyframe.observations)
-                < KEYFRAME_THRESHOLD
-            ):
+            )
+            if S is None:
+                continue
+            num_tracked = sum(inliers)
+            train_idxs = train_idxs[inliers]
+            frame.observations = [None] * num_tracked
+            for i in range(num_tracked):
+                landmark = tracked_frames[-1].observations[train_idxs[i]]
+                landmark.idxs |= {frame.id: i}
+                frame.observations[i] = landmark
+            frame.pose = S @ last_keyframe.pose
+            current_obs = frame.observations
+            current_pts = frame.key_pts[inliers]
+            if num_tracked / len(last_keyframe.key_pts) < KEYFRAME_THRESHOLD:
                 frame.is_keyframe = True
                 last_keyframe = frame
                 frame = detector(
@@ -136,7 +150,7 @@ if __name__ == "__main__":
                     current_obs = [
                         *current_obs,
                         *[
-                            ddict(frames=[frame.id], idxs=[i])
+                            ddict(idxs={frame.id: i})
                             for i in range(
                                 num_tracked,
                                 num_tracked + len(frame.key_pts),
@@ -153,8 +167,8 @@ if __name__ == "__main__":
                 [],
             )
         )
-        wait_draw()
-        wait_map()
+        # wait_draw()
+        # wait_map()
         if thread_context.is_closed:
             break
     thread_context.wait_close()

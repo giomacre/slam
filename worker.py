@@ -1,26 +1,34 @@
+from ctypes import c_bool
 from functools import partial
-from multiprocessing.dummy import Condition
-from queue import Empty, Queue
-from threading import Thread, current_thread
+
+# from multiprocessing.dummy import Condition
+from queue import Empty  # , Queue
+
+# from threading import Thread, current_thread
+from multiprocessing import Condition
+from multiprocessing import Process as Thread, current_process as current_thread
+from multiprocessing import JoinableQueue as Queue
+from multiprocessing import Value
 from decorators import handle_generator
 
 
 class ThreadContext:
     def __init__(self):
         self.__close_cond__ = Condition()
-        self.__is_closed__ = False
+        self.__is_closed__ = Value(c_bool, lock=False)
         self.__threads__ = []
 
     @property
     def is_closed(self):
-        return self.__is_closed__
+        with self.__close_cond__:
+            return self.__is_closed__.value
 
     def add_thread(self, thread, signal):
         self.__threads__ += [(thread, signal)]
 
     def close_context(self):
         with self.__close_cond__:
-            self.__is_closed__ = True
+            self.__is_closed__.value = True
             self.__close_cond__.notify_all()
 
     def start(self):

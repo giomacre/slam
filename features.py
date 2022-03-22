@@ -9,7 +9,7 @@ from slam_logging import log_feature_match, log_feature_extraction
 def create_orb_detector(compute_descriptors=True, **orb_args):
     orb = cv.ORB_create(**orb_args)
 
-    @log_feature_extraction
+    # @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
@@ -17,13 +17,7 @@ def create_orb_detector(compute_descriptors=True, **orb_args):
         if compute_descriptors:
             key_pts, frame.desc = orb.compute(frame.image, key_pts)
         frame.key_pts = np.array([k.pt for k in key_pts])
-        frame.observations = [
-            ddict(
-                frames=[frame.id],
-                idxs=[i],
-            )
-            for i in range(len(key_pts))
-        ]
+        frame.observations = [ddict(idxs={frame.id: i}) for i in range(len(key_pts))]
         return frame
 
     return orb_detector

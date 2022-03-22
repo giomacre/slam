@@ -68,14 +68,13 @@ def track_to_new_frame(query_frame, train_frame):
 
 
 def create_lk_tracker():
-    @log_feature_match
+    # @log_feature_match
     def tracker(query_frame, train_frame):
         tracked, good = track_to_new_frame(
             query_frame,
             train_frame,
         )
         num_tracked = np.count_nonzero(good)
-        query_frame.key_pts = tracked[good, ..., 0]
         query_idxs = np.arange(num_tracked)
         train_idxs = np.flatnonzero(good)
         return (
