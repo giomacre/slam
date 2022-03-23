@@ -2,9 +2,9 @@ import numpy as np
 from decorators import ddict
 
 
-def create_frame(image):
+def create_frame(id, image):
     return ddict(
-        id=0,
+        id=id,
         image=image,
         key_pts=np.array([]),
         desc=np.array([]),

@@ -48,14 +48,14 @@ def track_to_new_frame(query_frame, train_frame):
         train_pts.astype(np.float32),
         None,
     )
-    tracked_reversed, *_ = cv.calcOpticalFlowPyrLK(
+    tracked_reverse, *_ = cv.calcOpticalFlowPyrLK(
         query_gray,
         train_gray,
         tracked_points,
         None,
     )
-    good_tracks = np.abs(tracked_reversed - train_pts).max(axis=2) < 1
-    good_tracks = good_tracks.ravel()
+    good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 1
+    good_matches = good_matches.ravel()
     return (
         np.dstack(
             (
@@ -63,7 +63,7 @@ def track_to_new_frame(query_frame, train_frame):
                 train_pts.reshape(-1, 2),
             )
         ),
-        good_tracks,
+        good_matches,
     )
 
 

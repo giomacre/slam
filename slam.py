@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from decorators import ddict
 from drawing import create_drawer_thread
+from frame import create_frame
 from optical_flow import create_lk_orb_detector, create_lk_tracker
 from video import (
     Video,
@@ -78,8 +79,8 @@ if __name__ == "__main__":
     frames = video_stream
     tracked_frames = []
     last_keyframe = None
-    for frame in frames:
-        frame.id = len(tracked_frames)
+    for image in frames:
+        frame = create_frame(len(tracked_frames), image)
         if frame.id == 0:
             frame = detector(frame, N_FEATURES)
             if len(frame.key_pts) == 0:
@@ -95,15 +96,13 @@ if __name__ == "__main__":
             )
             if len(matches) == 0:
                 continue
-            # Use last frame to update the pose
-            # S, inliers = pose_estimator(matches)
-            # if S is None:
-            #     continue
-            # num_tracked = sum(inliers)
-            # frame.pose = S @ tracked_frames[-1].pose
-            # train_idxs = train_idxs[inliers]
-            frame.key_pts = matches[..., 0]
-            # Use Keyframe to update the pose
+            # Filter outliers with RANSAC
+            S, inliers = pose_estimator(matches)
+            if S is None:
+                continue
+            train_idxs = train_idxs[inliers]
+            frame.key_pts = matches[inliers, ..., 0]
+            # Compute the transform with respect to the last keyframe
             kf_idxs = np.array(
                 [
                     tracked_frames[-1].observations[i].idxs[last_keyframe.id]
@@ -167,8 +166,8 @@ if __name__ == "__main__":
                 [],
             )
         )
-        # wait_draw()
-        # wait_map()
+        wait_draw()
+        wait_map()
         if thread_context.is_closed:
             break
     thread_context.wait_close()

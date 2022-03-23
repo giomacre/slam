@@ -59,7 +59,7 @@ class Video:
                     (self.width, self.height),
                     interpolation=cv.INTER_AREA,
                 )
-            yield create_frame(frame)
+            yield frame
         self.release()
 
     def release(self):
