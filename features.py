@@ -6,18 +6,36 @@ from slam_logging import log_feature_match, log_feature_extraction
 # Detectors
 
 
-def create_orb_detector(compute_descriptors=True, **orb_args):
+def create_orb_detector(**orb_args):
     orb = cv.ORB_create(**orb_args)
 
-    # @log_feature_extraction
+    @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
-        key_pts = orb.detect(frame.image, mask=mask)
-        if compute_descriptors:
-            key_pts, frame.desc = orb.compute(frame.image, key_pts)
-        frame.key_pts = np.array([k.pt for k in key_pts])
-        frame.observations = [ddict(idxs={frame.id: i}) for i in range(len(key_pts))]
+        key_pts = np.array([k.pt for k in orb.detect(frame.image, mask=mask)])
+        observations = [
+            ddict(idxs={frame.id: i})
+            for i in range(
+                len(frame.observations),
+                len(frame.observations) + len(key_pts),
+            )
+        ]
+        if len(key_pts) == 0:
+            return frame
+        if len(frame.key_pts > 0):
+            key_pts = np.vstack(
+                [
+                    frame.key_pts,
+                    key_pts,
+                ]
+            )
+            observations = [
+                *frame.observations,
+                *observations,
+            ]
+        frame.key_pts = key_pts
+        frame.observations = observations
         return frame
 
     return orb_detector

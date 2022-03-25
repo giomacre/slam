@@ -6,17 +6,17 @@ from slam_logging import log_feature_match
 
 
 def create_lk_orb_detector(**orb_args):
-    orb = create_orb_detector(compute_descriptors=False, **orb_args)
+    orb = create_orb_detector(**orb_args)
 
-    def detector(query_frame, max_features=None, tracked_points=None):
+    def detector(query_frame, max_features=None):
         mask_trackings = None
-        if tracked_points is not None:
+        if len(query_frame.key_pts) > 0:
             mask_trackings = np.full_like(
                 query_frame.image[..., 0],
                 fill_value=255,
                 dtype=np.uint8,
             )
-            for point in tracked_points:
+            for point in query_frame.key_pts:
                 cv.circle(
                     mask_trackings,
                     np.int32(point),
@@ -68,7 +68,7 @@ def track_to_new_frame(query_frame, train_frame):
 
 
 def create_lk_tracker():
-    # @log_feature_match
+    @log_feature_match
     def tracker(query_frame, train_frame):
         tracked, good = track_to_new_frame(
             query_frame,

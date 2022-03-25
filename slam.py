@@ -69,7 +69,6 @@ if __name__ == "__main__":
             frame.is_keyframe = True
             last_keyframe = frame
         else:
-
             matches, query_idxs, train_idxs = tracker(
                 frame,
                 tracked_frames[-1],
@@ -102,42 +101,23 @@ if __name__ == "__main__":
             if S is None:
                 continue
             num_tracked = sum(inliers)
-            train_idxs = train_idxs[inliers]
+            kf_idxs = kf_idxs[inliers]
             frame.observations = [None] * num_tracked
             for i in range(num_tracked):
-                landmark = tracked_frames[-1].observations[train_idxs[i]]
+                landmark = last_keyframe.observations[kf_idxs[i]]
                 landmark.idxs |= {frame.id: i}
                 frame.observations[i] = landmark
             frame.pose = S @ last_keyframe.pose
-            current_obs = frame.observations
-            current_pts = frame.key_pts[inliers]
+            frame.key_pts = frame.key_pts[inliers]
             if num_tracked / len(last_keyframe.key_pts) < frontend_params.kf_threshold:
                 frame.is_keyframe = True
                 last_keyframe = frame
                 frame = detector(
                     frame,
                     frontend_params.n_features - num_tracked,
-                    current_pts,
                 )
-                if len(frame.key_pts) > 0:
-                    current_pts = np.vstack(
-                        [
-                            current_pts,
-                            frame.key_pts,
-                        ]
-                    )
-                    current_obs = [
-                        *current_obs,
-                        *[
-                            ddict(idxs={frame.id: i})
-                            for i in range(
-                                num_tracked,
-                                num_tracked + len(frame.key_pts),
-                            )
-                        ],
-                    ]
-            frame.key_pts = current_pts
-            frame.observations = current_obs
+                if len(frame.key_pts) == num_tracked:
+                    continue
         tracked_frames += [frame]
         wait_draw = send_draw_task(tracked_frames)
         wait_map = send_map_task(
