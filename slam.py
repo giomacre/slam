@@ -5,6 +5,7 @@ import sys
 from time import sleep
 import cv2
 import numpy as np
+from camera_calibration import get_calibration_matrix
 from decorators import ddict
 from drawing import create_drawer_thread
 from frame import create_frame
@@ -24,22 +25,15 @@ from geometry import (
 from visualization import create_map_thread
 from worker import create_thread_context
 from threading import current_thread
+from params import frontend_params
 
 np.set_printoptions(precision=3, suppress=True)
 
-
-DOWNSCALE = 1
-FX = 525
-FY = FX
-
-N_FEATURES = 350
-KEYFRAME_THRESHOLD = 0.75
 
 if __name__ == "__main__":
     video_path = sys.argv[1]
     video = Video(
         video_path,
-        downscale_factor=DOWNSCALE,
     )
     width, height = video.width, video.height
 
@@ -47,21 +41,7 @@ if __name__ == "__main__":
     send_draw_task = create_drawer_thread(thread_context, n_segments=10)
 
     video_stream = video.get_video_stream()
-    initialize_pose = partial(
-        skip_items,
-        video_stream,
-        take_every=6,
-        default_behaviour=lambda f: send_draw_task((f.image, [])),
-    )
-
-    K = np.array(
-        [
-            [FX / DOWNSCALE, 0, width / 2, 0],
-            [0, FY / DOWNSCALE, height / 2, 0],
-            [0, 0, 1, 0],
-        ]
-    )
-    Kinv = np.linalg.inv(K[:3, :3])
+    K, Kinv = get_calibration_matrix(video.width, video.height)
     detector = create_lk_orb_detector(
         scoreType=cv2.ORB_FAST_SCORE,
     )
@@ -69,7 +49,7 @@ if __name__ == "__main__":
     pose_estimator = create_pose_estimator(K)
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
-        (1280, 720),
+        (800, 600),
         Kinv,
         (width, height),
         thread_context,
@@ -82,7 +62,7 @@ if __name__ == "__main__":
     for image in frames:
         frame = create_frame(len(tracked_frames), image)
         if frame.id == 0:
-            frame = detector(frame, N_FEATURES)
+            frame = detector(frame, frontend_params.n_features)
             if len(frame.key_pts) == 0:
                 continue
             frame.pose = np.eye(4)
@@ -131,12 +111,12 @@ if __name__ == "__main__":
             frame.pose = S @ last_keyframe.pose
             current_obs = frame.observations
             current_pts = frame.key_pts[inliers]
-            if num_tracked / len(last_keyframe.key_pts) < KEYFRAME_THRESHOLD:
+            if num_tracked / len(last_keyframe.key_pts) < frontend_params.kf_threshold:
                 frame.is_keyframe = True
                 last_keyframe = frame
                 frame = detector(
                     frame,
-                    N_FEATURES - num_tracked,
+                    frontend_params.n_features - num_tracked,
                     current_pts,
                 )
                 if len(frame.key_pts) > 0:

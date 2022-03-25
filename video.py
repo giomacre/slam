@@ -29,14 +29,12 @@ class Video:
     def __init__(
         self,
         path,
-        downscale_factor=1,
     ):
         self.__filter__ = filter
         self.__count__ = 0
-        self.__downscale_factor__ = downscale_factor
         self.__video__ = cv.VideoCapture(path)
         self.height, self.width, *_ = (
-            int(self.__video__.get(p)) // downscale_factor
+            int(self.__video__.get(p))
             for p in [
                 cv.CAP_PROP_FRAME_HEIGHT,
                 cv.CAP_PROP_FRAME_WIDTH,
@@ -53,12 +51,6 @@ class Video:
             if not ret:
                 break
             self.__count__ += 1
-            if self.__downscale_factor__ > 1:
-                frame = cv.resize(
-                    frame,
-                    (self.width, self.height),
-                    interpolation=cv.INTER_AREA,
-                )
             yield frame
         self.release()
 
