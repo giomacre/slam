@@ -1,4 +1,4 @@
-from decorators import ddict
+from utils.decorators import ddict
 
 
 camera_params = ddict(

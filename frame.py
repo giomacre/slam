@@ -1,5 +1,5 @@
 import numpy as np
-from decorators import ddict
+from utils.decorators import ddict
 
 
 def create_frame(id, image):

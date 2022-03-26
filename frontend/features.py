@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
-from decorators import ddict
-from slam_logging import log_feature_match, log_feature_extraction
+from utils.decorators import ddict
+from utils.slam_logging import log_feature_match, log_feature_extraction
 
 # Detectors
 

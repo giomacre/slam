@@ -9,7 +9,7 @@ from multiprocessing import Condition
 from multiprocessing import Process as Thread, current_process as current_thread
 from multiprocessing import JoinableQueue as Queue
 from multiprocessing import Value
-from decorators import handle_generator
+from utils.decorators import handle_generator
 
 
 class ThreadContext:

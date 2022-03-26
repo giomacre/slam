@@ -6,15 +6,15 @@ from time import sleep
 import cv2
 import numpy as np
 from camera_calibration import get_calibration_matrix
-from decorators import ddict
-from drawing import create_drawer_thread
+from utils.decorators import ddict
+from frontend.visualization import create_drawer_thread
 from frame import create_frame
-from optical_flow import create_lk_orb_detector, create_lk_tracker
-from video import (
+from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
+from frontend.video import (
     Video,
     skip_items,
 )
-from features import (
+from frontend.features import (
     create_bruteforce_matcher,
     create_orb_detector,
 )
@@ -22,8 +22,8 @@ from geometry import (
     create_point_triangulator,
     create_pose_estimator,
 )
-from visualization import create_map_thread
-from worker import create_thread_context
+from mapping.visualization import create_map_thread
+from utils.worker import create_thread_context
 from threading import current_thread
 from params import frontend_params
 

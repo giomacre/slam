@@ -3,9 +3,9 @@ from functools import partial
 from time import sleep
 import cv2 as cv
 import numpy as np
-from decorators import stateful_decorator
+from utils.decorators import stateful_decorator
 
-from worker import create_worker
+from utils.worker import create_worker
 
 
 def create_drawer_thread(
@@ -36,10 +36,7 @@ def create_drawer_thread(
                 frames[-1].image,
                 [
                     np.array(
-                        [
-                            frames[f_id].key_pts[p_id]
-                            for f_id, p_id in obs
-                        ],
+                        [frames[f_id].key_pts[p_id] for f_id, p_id in obs],
                         dtype=np.int32,
                     )
                     for obs in observations
