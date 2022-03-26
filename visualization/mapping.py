@@ -5,7 +5,12 @@ from utils.worker import create_worker
 from utils.decorators import ddict, stateful_decorator
 import numpy as np
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.append(
+    os.path.join(
+        os.path.dirname(sys.argv[0]),
+        "lib",
+    )
+)
 import pypangolin as pango
 import OpenGL.GL as gl
 

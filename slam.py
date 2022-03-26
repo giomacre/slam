@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from camera_calibration import get_calibration_matrix
 from utils.decorators import ddict
-from frontend.visualization import create_drawer_thread
+from visualization.tracking import create_drawer_thread
 from frame import create_frame
 from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
 from frontend.video import (
@@ -22,7 +22,7 @@ from geometry import (
     create_point_triangulator,
     create_pose_estimator,
 )
-from mapping.visualization import create_map_thread
+from visualization.mapping import create_map_thread
 from utils.worker import create_thread_context
 from threading import current_thread
 from params import frontend_params
