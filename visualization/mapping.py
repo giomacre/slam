@@ -15,6 +15,70 @@ import pypangolin as pango
 import OpenGL.GL as gl
 
 
+def create_map_thread(windows_size, Kinv, video_size, thread_context):
+    render_context = ddict(
+        render_state=None,
+        display=None,
+    )
+    setup_window = partial(setup_pangolin, *windows_size, render_context)
+
+    decorator = stateful_decorator(needs=1)
+    visualization_loop = decorator(
+        partial(
+            draw_map,
+            render_context,
+            Kinv,
+            windows_size,
+        )
+    )
+    return create_worker(
+        visualization_loop,
+        thread_context,
+        one_shot=setup_window,
+        empty_queue_handler=lambda _: visualization_loop(),
+        name="PyPangolinViewer",
+    )
+
+
+def draw_map(
+    context,
+    Kinv,
+    video_size,
+    poses,
+    points,
+):
+    gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+    context.display.Activate(context.render_state)
+    gl.glColor(1.0, 0.85, 0.3)
+    for pose in poses[:-1]:
+        pango.glDrawFrustum(
+            Kinv,
+            *video_size,
+            pose,
+            0.2,
+        )
+    pango.glDrawLineStrip(
+        [
+            *map(
+                lambda p: p[:3, 3:],
+                poses,
+            )
+        ]
+    )
+    gl.glLineWidth(2)
+    gl.glColor(0.4, 0.0, 1.0)
+    pango.glDrawFrustum(
+        Kinv,
+        *video_size,
+        poses[-1],
+        1,
+    )
+    gl.glPointSize(2)
+    gl.glColor(1.0, 0.0, 0.0)
+    pango.glDrawPoints(points)
+    pango.FinishFrame()
+
+
 def setup_pangolin(
     width,
     height,
@@ -51,63 +115,3 @@ def setup_pangolin(
     display = pango.CreateDisplay().SetAspect(width / height).SetHandler(handler)
     context.render_state = render_state
     context.display = display
-
-
-def create_map_thread(windows_size, Kinv, video_size, thread_context):
-    render_context = ddict(
-        render_state=None,
-        display=None,
-    )
-    setup_window = partial(setup_pangolin, *windows_size, render_context)
-
-    def draw_map(
-        context,
-        Kinv,
-        poses,
-        points,
-    ):
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-        context.display.Activate(context.render_state)
-        gl.glColor(1.0, 0.85, 0.3)
-        for pose in poses[:-1]:
-            pango.glDrawFrustum(
-                Kinv,
-                *video_size,
-                pose,
-                0.2,
-            )
-        pango.glDrawLineStrip(
-            [
-                *map(
-                    lambda p: p[:3, 3:],
-                    poses,
-                )
-            ]
-        )
-        gl.glLineWidth(2)
-        gl.glColor(0.4, 0.0, 1.0)
-        pango.glDrawFrustum(
-            Kinv,
-            *video_size,
-            poses[-1],
-            1,
-        )
-        gl.glPointSize(2)
-        gl.glColor(1.0, 0.0, 0.0)
-        pango.glDrawPoints(points)
-        pango.FinishFrame()
-
-    decorator = stateful_decorator(needs=1)
-    visualization_loop = decorator(
-        partial(
-            draw_map,
-            render_context,
-            Kinv,
-        )
-    )
-    return create_worker(
-        visualization_loop,
-        thread_context,
-        one_shot=setup_window,
-        name="PyPangolinViewer",
-    )

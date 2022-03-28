@@ -5,15 +5,7 @@ import cv2
 
 def get_calibration_matrix(width, height):
 
-    fx, fy, cx, cy = [
-        camera_params[p]
-        for p in [
-            "fx",
-            "fy",
-            "cx",
-            "cy",
-        ]
-    ]
+    fx, fy, cx, cy = [camera_params[p] for p in ["fx", "fy", "cx", "cy"]]
     K = np.array(
         [
             [fx, 0, cx],
@@ -21,18 +13,7 @@ def get_calibration_matrix(width, height):
             [0, 0, 1],
         ]
     )
-    d = np.array(
-        [
-            camera_params[p]
-            for p in [
-                "k1",
-                "k2",
-                "p1",
-                "p2",
-                "k3",
-            ]
-        ]
-    )
+    d = np.array([camera_params[p] for p in ["k1", "k2", "p1", "p2", "k3"]])
     Knew, _ = cv2.getOptimalNewCameraMatrix(
         K,
         d,

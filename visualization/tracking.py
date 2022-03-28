@@ -22,6 +22,7 @@ def create_drawer_thread(
     worker = create_worker(
         draw_loop,
         thread_context,
+        empty_queue_handler=lambda _: draw_loop(),
         name="ImageViewer",
     )
 

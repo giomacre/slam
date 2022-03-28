@@ -58,12 +58,14 @@ def create_worker(
     thread_context,
     one_shot=lambda: None,
     name=None,
+    timeout=32e-3,
+    empty_queue_handler=lambda _: None,
 ):
     queue = Queue()
     queue_iter = handle_generator(
         iter,
         exception=Empty,
-        handler=lambda _: target(),
+        handler=empty_queue_handler,
     )
 
     def register_task(task):
@@ -73,7 +75,7 @@ def create_worker(
     def worker_loop(queue):
         one_shot()
         for args in queue_iter(
-            partial(queue.get, timeout=0.015),
+            partial(queue.get, timeout=timeout),
             None,
         ):
             target(*args)
