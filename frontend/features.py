@@ -1,5 +1,6 @@
 import cv2 as cv
 import numpy as np
+from mapping.point import create_point
 from utils.decorators import ddict
 from utils.slam_logging import log_feature_match, log_feature_extraction
 
@@ -15,7 +16,7 @@ def create_orb_detector(**orb_args):
             orb.setMaxFeatures(max_features)
         key_pts = np.array([k.pt for k in orb.detect(frame.image, mask=mask)])
         observations = [
-            ddict(idxs={frame.id: i})
+            create_point(frame, i)
             for i in range(
                 len(frame.observations),
                 len(frame.observations) + len(key_pts),

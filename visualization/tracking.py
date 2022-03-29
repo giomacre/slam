@@ -1,5 +1,6 @@
 from concurrent.futures import thread
 from functools import partial
+from itertools import islice
 from time import sleep
 import cv2 as cv
 import numpy as np
@@ -29,8 +30,7 @@ def create_drawer_thread(
     def draw_task(frames):
         observations = []
         for pt in frames[-1].observations:
-            n_points = n_segments + 1 if (n := len(pt.idxs)) > n_segments else n
-            last_n = [*sorted(pt.idxs.items(), key=lambda v: v[0])][-n_points:]
+            last_n = reversed([*islice(reversed(pt.idxs.items()), n_segments)])
             observations += [last_n]
         return worker(
             (

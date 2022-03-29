@@ -68,7 +68,7 @@ def track_to_new_frame(query_frame, train_frame):
 
 
 def create_lk_tracker():
-    @log_feature_match
+    # @log_feature_match
     def tracker(query_frame, train_frame):
         tracked, good = track_to_new_frame(
             query_frame,

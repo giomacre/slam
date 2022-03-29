@@ -5,7 +5,6 @@ from utils.slam_logging import log_pose_estimation, log_triangulation
 
 
 def create_pose_estimator(K):
-    K = K[:3, :3]
     no_pose = [None] * 2
 
     # @log_pose_estimation
@@ -47,6 +46,8 @@ def get_relative_transform(K, points):
 
 def create_point_triangulator(K):
     # @log_triangulation
+    K = np.hstack((K, np.array([0, 0, 0]).reshape(3, 1)))
+
     def triangulation(
         current_pose,
         reference_pose,
@@ -57,8 +58,8 @@ def create_point_triangulator(K):
         reference_extrinsics = to_extrinsics(reference_pose)
         points_4d = np.array(
             cv.triangulatePoints(
-                (K @ reference_extrinsics)[:3],
-                (K @ current_extrinsics)[:3],
+                (K @ reference_extrinsics),
+                (K @ current_extrinsics),
                 reference_points.T,
                 current_points.T,
             )
@@ -67,7 +68,7 @@ def create_point_triangulator(K):
         points_4d /= points_4d[:, -1:]
         camera_coordinates = current_extrinsics @ points_4d.T
         in_front = camera_coordinates[2, :] > 0.0
-        return points_4d[in_front]
+        return points_4d[..., :3], in_front
 
     return triangulation
 
