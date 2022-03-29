@@ -23,3 +23,23 @@ def get_calibration_matrix(width, height):
     )
     K_inv = np.linalg.inv(Knew)
     return Knew, K_inv
+
+
+def to_homogeneous(x):
+    return np.concatenate(
+        (
+            x,
+            np.ones(shape=(x.shape[0], 1, *x.shape[2:])),
+        ),
+        axis=1,
+    )
+
+
+def to_camera_coords(K_inv, x):
+    return (K_inv @ to_homogeneous(x).T).T
+
+
+def to_image_coords(K, x):
+    projected = (K @ x.T).T
+    scaled = projected / projected[:, -1, ..., None]
+    return scaled[:, :2, ...]

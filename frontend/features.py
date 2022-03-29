@@ -8,13 +8,20 @@ from utils.slam_logging import log_feature_match, log_feature_extraction
 
 
 def create_orb_detector(**orb_args):
+    KEYPOINT_DEFAULTS = dict(
+        size=1,
+        response=1,
+        octave=0,
+        class_id=-1,
+    )
     orb = cv.ORB_create(**orb_args)
 
     @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
-        key_pts = np.array([k.pt for k in orb.detect(frame.image, mask=mask)])
+        key_pts = orb.detect(frame.image, mask=mask)
+        key_pts = np.array([k.pt for k in key_pts])
         observations = [
             create_point(frame, i)
             for i in range(
@@ -36,6 +43,16 @@ def create_orb_detector(**orb_args):
                 *observations,
             ]
         frame.key_pts = key_pts
+        frame.desc = orb.compute(
+            frame.image,
+            [
+                cv.KeyPoint(
+                    *kp,
+                    **KEYPOINT_DEFAULTS,
+                )
+                for kp in frame.key_pts
+            ],
+        )
         frame.observations = observations
         return frame
 

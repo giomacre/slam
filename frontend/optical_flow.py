@@ -6,7 +6,7 @@ from utils.slam_logging import log_feature_match
 
 
 def create_lk_orb_detector(**orb_args):
-    orb = create_orb_detector(**orb_args)
+    base_detector = create_orb_detector(**orb_args)
 
     def detector(query_frame, max_features=None):
         mask_trackings = None
@@ -24,7 +24,7 @@ def create_lk_orb_detector(**orb_args):
                     0,
                     thickness=cv.FILLED,
                 )
-        return orb(
+        return base_detector(
             query_frame,
             max_features,
             mask_trackings,

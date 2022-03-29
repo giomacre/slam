@@ -1,4 +1,5 @@
 import cv2
+from camera_calibration import to_camera_coords
 from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
 from geometry import create_pose_estimator
 from params import frontend_params
@@ -7,10 +8,16 @@ import numpy as np
 from utils.decorators import ddict
 
 
-def create_localizer(detector, tracker, pose_estimator):
+def create_localizer(
+    projection,
+    inverse_projection,
+    detector,
+    tracker,
+    pose_estimator,
+):
     context = ddict
     context.last_frame = None
-    context.current_keyframe=None
+    context.current_keyframe = None
 
     def localization(frame):
         if frame.id == 0:
@@ -22,7 +29,7 @@ def create_localizer(detector, tracker, pose_estimator):
             context.current_keyframe = frame
             context.last_frame = frame
             return frame
-        matches, query_idxs, train_idxs = tracker(
+        matches, _, train_idxs = tracker(
             frame,
             context.last_frame,
         )
@@ -60,7 +67,10 @@ def create_localizer(detector, tracker, pose_estimator):
             frame.observations[i] = landmark
         frame.pose = S @ context.current_keyframe.pose
         frame.key_pts = frame.key_pts[inliers]
-        if num_tracked / len(context.current_keyframe.key_pts) < frontend_params.kf_threshold:
+        if (
+            num_tracked / len(context.current_keyframe.key_pts)
+            < frontend_params.kf_threshold
+        ):
             frame.is_keyframe = True
             context.current_keyframe = frame
             frame = detector(
@@ -69,6 +79,7 @@ def create_localizer(detector, tracker, pose_estimator):
             )
             if len(frame.key_pts) == num_tracked:
                 return None
+            frame.pts_camera = inverse_projection(frame.key_pts)
         context.last_frame = frame
         return frame
 

@@ -6,7 +6,7 @@ from time import sleep
 from typing import DefaultDict
 import cv2
 import numpy as np
-from camera_calibration import get_calibration_matrix
+from camera_calibration import get_calibration_matrix, to_camera_coords, to_image_coords
 from frontend.localization import create_localizer
 from utils.decorators import ddict
 from visualization.tracking import create_drawer_thread
@@ -42,12 +42,16 @@ if __name__ == "__main__":
 
     video_stream = video.get_video_stream()
     K, Kinv = get_calibration_matrix(video.width, video.height)
-    detector = create_lk_orb_detector(
-        scoreType=cv2.ORB_FAST_SCORE,
-    )
+    detector = create_lk_orb_detector(scoreType=cv2.ORB_FAST_SCORE)
     tracker = create_lk_tracker()
     pose_estimator = create_pose_estimator(K)
-    localization = create_localizer(detector, tracker, pose_estimator)
+    localization = create_localizer(
+        lambda x: to_image_coords(K, x),
+        lambda x: to_camera_coords(Kinv, x),
+        detector,
+        tracker,
+        pose_estimator,
+    )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
         (800, 600),
@@ -93,13 +97,13 @@ if __name__ == "__main__":
                     frame.observations[i].coords = pt
                     map_points += [pt]
 
-            send_map_task(
-                (
-                    [frame.pose for frame in tracked_frames],
-                    map_points,
-                )
-            )
         send_draw_task(tracked_frames)
+        send_map_task(
+            (
+                [frame.pose for frame in tracked_frames],
+                map_points,
+            )
+        )
         if thread_context.is_closed:
             break
     thread_context.wait_close()
