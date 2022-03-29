@@ -1,5 +1,7 @@
+from functools import reduce
 import numpy as np
 import cv2 as cv
+from camera_calibration import to_image_coords
 from utils.decorators import ddict
 from utils.slam_logging import log_pose_estimation, log_triangulation
 
@@ -66,9 +68,32 @@ def create_point_triangulator(K):
         ).T
         points_4d = points_4d[points_4d[:, -1] != 0]
         points_4d /= points_4d[:, -1:]
-        camera_coordinates = current_extrinsics @ points_4d.T
-        in_front = camera_coordinates[2, :] > 0.0
-        return points_4d[..., :3], in_front
+        camera_coords = np.dstack(
+            [
+                (extrinsics @ points_4d.T).T
+                for extrinsics in [
+                    current_extrinsics,
+                    reference_extrinsics,
+                ]
+            ]
+        ).T
+        projected = to_image_coords(K, camera_coords)
+        low_err = reduce(
+            np.bitwise_and,
+            (
+                np.linalg.norm(a - b.T, axis=0) < 5.0
+                for a, b in zip(
+                    projected,
+                    [current_points, reference_points],
+                )
+            ),
+        )
+        in_front = reduce(
+            np.bitwise_and,
+            (pts[2, :] > 0 for pts in camera_coords),
+        ).T
+        good_pts = in_front & low_err
+        return points_4d[..., :3], good_pts
 
     return triangulation
 

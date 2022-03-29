@@ -29,17 +29,20 @@ def to_homogeneous(x):
     return np.concatenate(
         (
             x,
-            np.ones(shape=(x.shape[0], 1, *x.shape[2:])),
+            np.ones(shape=(*x.shape[:-2], 1, x.shape[-1])),
         ),
-        axis=1,
+        axis=np.arange(len(x.shape))[-2],
     )
 
 
 def to_camera_coords(K_inv, x):
-    return (K_inv @ to_homogeneous(x).T).T
+    return K_inv @ to_homogeneous(x)
 
 
 def to_image_coords(K, x):
-    projected = (K @ x.T).T
-    scaled = projected / projected[:, -1, ..., None]
+    projected = K @ x
+    scaled = projected / projected.take(
+        indices=-1,
+        axis=np.arange(len(x.shape))[-2],
+    ).reshape((*x.shape[:-2], 1, x.shape[-1]))
     return scaled[:, :2, ...]

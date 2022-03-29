@@ -79,7 +79,7 @@ def create_localizer(
             )
             if len(frame.key_pts) == num_tracked:
                 return None
-            frame.pts_camera = inverse_projection(frame.key_pts)
+            frame.pts_camera = inverse_projection(frame.key_pts.T).T
         context.last_frame = frame
         return frame
 
