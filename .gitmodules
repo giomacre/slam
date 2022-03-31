@@ -7,3 +7,6 @@
 [submodule "external/Sophus"]
 	path = external/Sophus
 	url = https://github.com/giomacre/Sophus
+[submodule "external/ANMS-Codes"]
+	path = external/ANMS-Codes
+	url = https://github.com/BAILOOL/ANMS-Codes

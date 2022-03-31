@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     video_stream = video.get_video_stream()
     K, Kinv = get_calibration_matrix(video.width, video.height)
-    detector = create_lk_orb_detector(scoreType=cv2.ORB_FAST_SCORE)
+    detector = create_lk_orb_detector()
     tracker = create_lk_tracker()
     pose_estimator = create_pose_estimator(K)
     localization = create_localizer(
@@ -95,13 +95,13 @@ if __name__ == "__main__":
                 )
                 for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):
                     frame.observations[i].coords = pt
-                    map_points += [pt]
+                    map_points += [frame.observations[i]]
 
         send_draw_task(tracked_frames)
         send_map_task(
             (
                 [frame.pose for frame in tracked_frames],
-                map_points,
+                [lm.coords for lm in map_points],
             )
         )
         if thread_context.is_closed:

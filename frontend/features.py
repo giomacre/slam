@@ -1,27 +1,47 @@
+import os
+from re import A
+import sys
 import cv2 as cv
 import numpy as np
 from mapping.point import create_point
 from utils.decorators import ddict
 from utils.slam_logging import log_feature_match, log_feature_extraction
 
+sys.path.append(
+    os.path.join(
+        os.path.dirname(sys.argv[0]),
+        "external",
+        "ANMS-Codes",
+        "Python",
+    )
+)
+from ssc import ssc
+
 # Detectors
 
 
 def create_orb_detector(**orb_args):
-    KEYPOINT_DEFAULTS = dict(
-        size=1,
-        response=1,
-        octave=0,
-        class_id=-1,
-    )
     orb = cv.ORB_create(**orb_args)
+    detector = cv.FastFeatureDetector_create()
 
     @log_feature_extraction
-    def orb_detector(frame, max_features=None, mask=None):
+    def orb_detector(frame, max_features, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
-        key_pts = orb.detect(frame.image, mask=mask)
-        key_pts = np.array([k.pt for k in key_pts])
+        key_pts = detector.detect(frame.image, mask=mask)
+        key_pts = sorted(
+            key_pts,
+            key=lambda x: x.response,
+            reverse=True,
+        )
+        key_pts = ssc(
+            key_pts,
+            max_features,
+            0.1,
+            frame.image.shape[1],
+            frame.image.shape[0],
+        )
+        key_pts = cv.KeyPoint_convert(key_pts)
         observations = [
             create_point(frame, i)
             for i in range(
@@ -45,14 +65,8 @@ def create_orb_detector(**orb_args):
         frame.key_pts = key_pts
         frame.desc = orb.compute(
             frame.image,
-            [
-                cv.KeyPoint(
-                    *kp,
-                    **KEYPOINT_DEFAULTS,
-                )
-                for kp in frame.key_pts
-            ],
-        )
+            cv.KeyPoint_convert(frame.key_pts),
+        )[1]
         frame.observations = observations
         return frame
 
