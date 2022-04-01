@@ -12,14 +12,7 @@ from utils.decorators import ddict
 from visualization.tracking import create_drawer_thread
 from frontend.frame import create_frame
 from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
-from frontend.video import (
-    Video,
-    skip_items,
-)
-from frontend.features import (
-    create_bruteforce_matcher,
-    create_orb_detector,
-)
+from frontend.video import Video
 from geometry import (
     create_point_triangulator,
     create_pose_estimator,
@@ -46,8 +39,6 @@ if __name__ == "__main__":
     tracker = create_lk_tracker()
     pose_estimator = create_pose_estimator(K)
     localization = create_localizer(
-        lambda x: to_image_coords(K, x),
-        lambda x: to_camera_coords(Kinv, x),
         detector,
         tracker,
         pose_estimator,
@@ -94,16 +85,15 @@ if __name__ == "__main__":
                     tracked_frames[f_id].key_pts[ref_idxs],
                 )
                 for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):
-                    frame.observations[i].coords = pt
-                    map_points += [frame.observations[i]]
+                    to_idx = lambda kp: tuple(np.rint(kp).astype(int)[::-1])
+                    landmark = frame.observations[i]
+                    landmark.coords = pt
+                    img_idx = to_idx(frame.key_pts[i])
+                    landmark.color = frame.image[img_idx] / 255.0
+                    map_points += [landmark]
 
         send_draw_task(tracked_frames)
-        send_map_task(
-            (
-                [frame.pose for frame in tracked_frames],
-                [lm.coords for lm in map_points],
-            )
-        )
+        send_map_task(tracked_frames, map_points)
         if thread_context.is_closed:
             break
     thread_context.wait_close()

@@ -30,19 +30,24 @@ def create_drawer_thread(
     def draw_task(frames):
         observations = []
         for pt in frames[-1].observations:
-            last_n = reversed([*islice(reversed(pt.idxs.items()), n_segments)])
+            last_n = reversed(
+                [
+                    *islice(
+                        reversed(pt.idxs.items()),
+                        n_segments,
+                    )
+                ]
+            )
             observations += [last_n]
         return worker(
-            (
-                frames[-1].image,
-                [
-                    np.array(
-                        [frames[f_id].key_pts[p_id] for f_id, p_id in obs],
-                        dtype=np.int32,
-                    )
-                    for obs in observations
-                ],
-            )
+            frames[-1].image,
+            [
+                np.array(
+                    [frames[f_id].key_pts[p_id] for f_id, p_id in obs],
+                    dtype=np.int32,
+                )
+                for obs in observations
+            ],
         )
 
     return draw_task

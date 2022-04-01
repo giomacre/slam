@@ -1,4 +1,5 @@
 import cv2 as cv
+from functools import reduce
 import numpy as np
 from utils.decorators import ddict
 from frontend.features import create_orb_detector
@@ -34,7 +35,7 @@ def create_lk_orb_detector(**orb_args):
 
 
 def track_to_new_frame(query_frame, train_frame):
-    train_pts = train_frame.key_pts.reshape(-1, 1, 2)
+    train_pts = train_frame.key_pts.reshape(-1, 1, 2).copy()
     query_gray, train_gray = (
         cv.cvtColor(f.image, cv.COLOR_BGR2GRAY)
         for f in [
@@ -42,43 +43,71 @@ def track_to_new_frame(query_frame, train_frame):
             train_frame,
         ]
     )
-    tracked_points, *_ = cv.calcOpticalFlowPyrLK(
+    tracked_points, status, _ = cv.calcOpticalFlowPyrLK(
         train_gray,
         query_gray,
-        train_pts.astype(np.float32),
+        train_pts,
         None,
+        flags=cv.OPTFLOW_LK_GET_MIN_EIGENVALS,
     )
-    tracked_reverse, *_ = cv.calcOpticalFlowPyrLK(
+    status = status.ravel().astype(np.bool)
+    inside_limits = reduce(
+        np.bitwise_and,
+        [
+            tracked_points[..., 0] >= 0.5,
+            tracked_points[..., 0] < query_gray.shape[1] - 0.5,
+            tracked_points[..., 1] >= 0.5,
+            tracked_points[..., 1] < query_gray.shape[0] - 0.5,
+        ],
+    ).ravel()
+    tracked_reverse, status_reverse, _ = cv.calcOpticalFlowPyrLK(
         query_gray,
         train_gray,
         tracked_points,
-        None,
+        train_pts,
+        flags=sum(
+            [
+                cv.OPTFLOW_USE_INITIAL_FLOW,
+                cv.OPTFLOW_LK_GET_MIN_EIGENVALS,
+            ]
+        ),
     )
-    good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 1
+    status_reverse = status_reverse.ravel().astype(np.bool)
+    good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 0.5
     good_matches = good_matches.ravel()
+    good_idxs = np.flatnonzero(
+        reduce(
+            np.bitwise_and,
+            [
+                status,
+                inside_limits,
+                status_reverse,
+                good_matches,
+            ],
+        )
+    )
     return (
         np.dstack(
             (
-                tracked_points.reshape(-1, 2),
-                train_pts.reshape(-1, 2),
+                tracked_points[good_idxs].reshape(-1, 2),
+                train_pts[good_idxs].reshape(-1, 2),
             )
         ),
-        good_matches,
+        good_idxs,
     )
 
 
 def create_lk_tracker():
     # @log_feature_match
     def tracker(query_frame, train_frame):
-        tracked, good = track_to_new_frame(
+        tracked, train_idxs = track_to_new_frame(
             query_frame,
             train_frame,
         )
-        num_tracked = np.count_nonzero(good)
+        num_tracked = len(train_idxs)
         query_idxs = np.arange(num_tracked)
-        train_idxs = np.flatnonzero(good)
         return (
-            tracked[good],
+            tracked,
             query_idxs,
             train_idxs,
         )

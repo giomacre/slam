@@ -31,13 +31,21 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
             windows_size,
         )
     )
-    return create_worker(
+    worker = create_worker(
         visualization_loop,
         thread_context,
         one_shot=setup_window,
         empty_queue_handler=lambda _: visualization_loop(),
         name="PyPangolinViewer",
     )
+
+    def prepare_task(frames, points):
+        worker(
+            [f.pose for f in frames],
+            [(p.coords, p.color) for p in points],
+        )
+
+    return prepare_task
 
 
 def draw_map(
@@ -74,8 +82,10 @@ def draw_map(
         1,
     )
     gl.glPointSize(2)
-    gl.glColor(1.0, 0.0, 0.0)
-    pango.glDrawPoints(points)
+    for pt, color in points:
+        gl.glColor(*color)
+        pango.glDrawPoints([pt])
+
     pango.FinishFrame()
 
 

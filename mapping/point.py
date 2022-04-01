@@ -6,5 +6,6 @@ def create_point(frame, key_pt_idx):
     point = ddict(
         idxs=OrderedDict({frame.id: key_pt_idx}),
         coords=None,
+        color=None,
     )
     return point

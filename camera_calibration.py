@@ -13,16 +13,8 @@ def get_calibration_matrix(width, height):
             [0, 0, 1],
         ]
     )
-    d = np.array([camera_params[p] for p in ["k1", "k2", "p1", "p2", "k3"]])
-    Knew, _ = cv2.getOptimalNewCameraMatrix(
-        K,
-        d,
-        (width, height),
-        camera_params.alpha,
-        (width, height),
-    )
-    K_inv = np.linalg.inv(Knew)
-    return Knew, K_inv
+    K_inv = np.linalg.inv(K)
+    return K, K_inv
 
 
 def to_homogeneous(x):

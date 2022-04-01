@@ -4,13 +4,11 @@ from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
 from geometry import create_pose_estimator
 from params import frontend_params
 import numpy as np
-
+import copy
 from utils.decorators import ddict
 
 
 def create_localizer(
-    projection,
-    inverse_projection,
     detector,
     tracker,
     pose_estimator,
@@ -71,15 +69,15 @@ def create_localizer(
             num_tracked / len(context.current_keyframe.key_pts)
             < frontend_params.kf_threshold
         ):
-            frame.is_keyframe = True
-            context.current_keyframe = frame
             frame = detector(
                 frame,
                 frontend_params.n_features - num_tracked,
             )
             if len(frame.key_pts) == num_tracked:
                 return None
-            frame.pts_camera = inverse_projection(frame.key_pts.T).T
+            frame.is_keyframe = True
+            context.last_frame = frame
+            context.current_keyframe = frame
         context.last_frame = frame
         return frame
 

@@ -28,6 +28,7 @@ def use_arguments(decorator):
 
     return pass_parameters
 
+
 def handle_generator(
     generator_factory,
     *_,

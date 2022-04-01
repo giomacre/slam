@@ -68,8 +68,8 @@ def create_worker(
         handler=empty_queue_handler,
     )
 
-    def register_task(task):
-        queue.put(task)
+    def register_task(*args):
+        queue.put(args)
         return queue.join
 
     def worker_loop(queue):
