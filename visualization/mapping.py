@@ -35,6 +35,7 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
         visualization_loop,
         thread_context,
         one_shot=setup_window,
+        timeout=16e-3,
         empty_queue_handler=lambda _: visualization_loop(),
         name="PyPangolinViewer",
     )

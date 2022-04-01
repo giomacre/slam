@@ -21,7 +21,7 @@ def create_lk_orb_detector(**orb_args):
                 cv.circle(
                     mask_trackings,
                     np.int32(point),
-                    20,
+                    10,
                     0,
                     thickness=cv.FILLED,
                 )
@@ -104,12 +104,6 @@ def create_lk_tracker():
             query_frame,
             train_frame,
         )
-        num_tracked = len(train_idxs)
-        query_idxs = np.arange(num_tracked)
-        return (
-            tracked,
-            query_idxs,
-            train_idxs,
-        )
+        return tracked, train_idxs
 
     return tracker

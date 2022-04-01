@@ -21,6 +21,7 @@ from visualization.mapping import create_map_thread
 from utils.worker import create_thread_context
 from threading import current_thread
 from params import frontend_params
+from pympler.asizeof import asizeof, asized
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
             candidate_pts = [
                 lm
                 for lm in frame.observations
-                if lm.coords is None and len(lm.idxs) > 1
+                if not lm.is_initialized and len(lm.idxs) > 1
             ]
             matches = DefaultDict(lambda: [[], []])
             for lm in candidate_pts:
@@ -90,6 +91,7 @@ if __name__ == "__main__":
                     landmark.coords = pt
                     img_idx = to_idx(frame.key_pts[i])
                     landmark.color = frame.image[img_idx] / 255.0
+                    landmark.is_initialized = True
                     map_points += [landmark]
 
         send_draw_task(tracked_frames)

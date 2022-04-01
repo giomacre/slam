@@ -15,6 +15,6 @@ camera_params = ddict(
 )
 
 frontend_params = ddict(
-    n_features=350,
+    n_features=500,
     kf_threshold=0.75,
 )

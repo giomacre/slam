@@ -27,7 +27,7 @@ def create_localizer(
             context.current_keyframe = frame
             context.last_frame = frame
             return frame
-        matches, _, train_idxs = tracker(
+        matches, train_idxs = tracker(
             frame,
             context.last_frame,
         )
