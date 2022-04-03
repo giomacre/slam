@@ -1,27 +1,18 @@
 #!/usr/bin/env python3
 
-from functools import partial, reduce
 import sys
-from time import sleep
 from typing import DefaultDict
-import cv2
 import numpy as np
-from camera_calibration import get_calibration_matrix, to_camera_coords, to_image_coords
-from frontend.localization import create_localizer
-from utils.decorators import ddict
+from camera_calibration import get_calibration_matrix
+from frontend.method import create_frontend
 from visualization.tracking import create_drawer_thread
 from frontend.frame import create_frame
 from frontend.optical_flow import create_lk_orb_detector, create_lk_tracker
 from frontend.video import Video
-from geometry import (
-    create_point_triangulator,
-    create_pose_estimator,
-)
+from geometry import create_point_triangulator, create_epipolar_localizer
 from visualization.mapping import create_map_thread
 from utils.worker import create_thread_context
 from threading import current_thread
-from params import frontend_params
-from pympler.asizeof import asizeof, asized
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -38,11 +29,11 @@ if __name__ == "__main__":
     K, Kinv = get_calibration_matrix(video.width, video.height)
     detector = create_lk_orb_detector()
     tracker = create_lk_tracker()
-    pose_estimator = create_pose_estimator(K)
-    localization = create_localizer(
+    epipolar_localizer = create_epipolar_localizer(K)
+    localization = create_frontend(
         detector,
         tracker,
-        pose_estimator,
+        epipolar_localizer,
     )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(

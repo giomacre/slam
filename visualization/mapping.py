@@ -43,7 +43,7 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
     def prepare_task(frames, points):
         worker(
             [f.pose for f in frames],
-            [(p.coords, p.color) for p in points],
+            *zip(*((p.coords, p.color) for p in points)),
         )
 
     return prepare_task
@@ -54,17 +54,19 @@ def draw_map(
     Kinv,
     video_size,
     poses,
-    points,
+    points=None,
+    colors=None,
 ):
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
     context.display.Activate(context.render_state)
     gl.glColor(1.0, 0.85, 0.3)
+    gl.glLineWidth(1)
     for pose in poses[:-1]:
         pango.glDrawFrustum(
             Kinv,
             *video_size,
             pose,
-            0.2,
+            0.3,
         )
     pango.glDrawLineStrip(
         [
@@ -83,9 +85,8 @@ def draw_map(
         1,
     )
     gl.glPointSize(2)
-    for pt, color in points:
-        gl.glColor(*color)
-        pango.glDrawPoints([pt])
+    if points is not None:
+        pango.DrawPoints(points, colors)
 
     pango.FinishFrame()
 

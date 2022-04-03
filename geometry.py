@@ -6,7 +6,7 @@ from utils.decorators import ddict
 from utils.slam_logging import log_pose_estimation, log_triangulation
 
 
-def create_pose_estimator(K):
+def create_epipolar_localizer(K):
     no_pose = [None] * 2
 
     # @log_pose_estimation
