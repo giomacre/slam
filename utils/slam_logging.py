@@ -1,6 +1,7 @@
 from collections import deque
 from functools import partial, wraps
 from numpy import mean
+import numpy
 from utils.decorators import use_arguments
 
 
@@ -36,7 +37,7 @@ def performance_timer(
 
 
 log_pose_estimation = performance_timer(
-    value_analysis=lambda v: f", and {v} points passed the cheirality check"
+    value_analysis=lambda v: f"with {numpy.sum(v[1])} inliers"
 )
 log_feature_extraction = performance_timer(
     value_analysis=lambda v: f"{len(v.key_pts)} features"

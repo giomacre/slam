@@ -6,8 +6,8 @@ from frontend.features import create_orb_detector
 from utils.slam_logging import log_feature_match
 
 
-def create_lk_orb_detector(**orb_args):
-    base_detector = create_orb_detector(**orb_args)
+def create_lk_orb_detector(undistort, **orb_args):
+    base_detector = create_orb_detector(undistort, **orb_args)
 
     def detector(query_frame, max_features=None):
         mask_trackings = None
@@ -34,6 +34,7 @@ def create_lk_orb_detector(**orb_args):
     return detector
 
 
+@log_feature_match
 def track_to_new_frame(query_frame, train_frame):
     train_pts = train_frame.key_pts.reshape(-1, 1, 2).copy()
     query_gray, train_gray = (
@@ -87,23 +88,6 @@ def track_to_new_frame(query_frame, train_frame):
         )
     )
     return (
-        np.dstack(
-            (
-                tracked_points[good_idxs].reshape(-1, 2),
-                train_pts[good_idxs].reshape(-1, 2),
-            )
-        ),
+        tracked_points[good_idxs].reshape(-1, 2),
         good_idxs,
     )
-
-
-def create_lk_tracker():
-    # @log_feature_match
-    def tracker(query_frame, train_frame):
-        tracked, train_idxs = track_to_new_frame(
-            query_frame,
-            train_frame,
-        )
-        return tracked, train_idxs
-
-    return tracker

@@ -20,11 +20,11 @@ from ssc import ssc
 # Detectors
 
 
-def create_orb_detector(**orb_args):
+def create_orb_detector(undistort, **orb_args):
     orb = cv.ORB_create(**orb_args)
     detector = cv.FastFeatureDetector_create()
 
-    # @log_feature_extraction
+    @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
@@ -42,6 +42,9 @@ def create_orb_detector(**orb_args):
             frame.image.shape[0],
         )
         key_pts = cv.KeyPoint_convert(key_pts)
+        if len(key_pts) == 0:
+            return frame
+        undist = undistort(key_pts)
         observations = [
             create_point(frame, i)
             for i in range(
@@ -49,8 +52,6 @@ def create_orb_detector(**orb_args):
                 len(frame.observations) + len(key_pts),
             )
         ]
-        if len(key_pts) == 0:
-            return frame
         if len(frame.key_pts > 0):
             key_pts = np.vstack(
                 [
@@ -58,11 +59,18 @@ def create_orb_detector(**orb_args):
                     key_pts,
                 ]
             )
+            undist = np.vstack(
+                [
+                    frame.undist,
+                    undist,
+                ]
+            )
             observations = [
                 *frame.observations,
                 *observations,
             ]
         frame.key_pts = key_pts
+        frame.undist = undist
         frame.desc = orb.compute(
             frame.image,
             cv.KeyPoint_convert(frame.key_pts),

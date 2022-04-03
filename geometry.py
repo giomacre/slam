@@ -1,4 +1,5 @@
 from functools import reduce
+from cv2 import undistortPoints
 import numpy as np
 import cv2 as cv
 from camera_calibration import to_image_coords
@@ -6,44 +7,36 @@ from utils.decorators import ddict
 from utils.slam_logging import log_pose_estimation, log_triangulation
 
 
-def create_epipolar_localizer(K):
-    no_pose = [None] * 2
-
-    # @log_pose_estimation
-    def compute_pose(matches):
-        R, t, mask = get_relative_transform(K, matches)
-        if R is None:
-            return no_pose
-        mask = mask.astype(np.bool).ravel()
-        S = np.vstack(
-            (np.hstack((R, t)), [0, 0, 0, 1]),
-        )
-        return S, mask
-
-    return compute_pose
-
-
-def get_relative_transform(K, points):
+@log_pose_estimation
+def epipolar_ransac(K,query_pts, train_pts):
     E, mask = cv.findEssentialMat(
-        points[..., 1],
-        points[..., 0],
+        train_pts,
+        query_pts,
         K,
-        threshold=1.0,
     )
     if E is None:
-        return [None] * 3
+        return [None] * 2
+    # train_pts, query_pts = cv.correctMatches(
+    #     E,
+    #     train_pts[None, ...],
+    #     query_pts[None, ...],
+    # )
     _, R, t, mask_pose = cv.recoverPose(
         E,
-        points[..., 1],
-        points[..., 0],
+        train_pts,
+        query_pts,
         K,
         mask=mask.copy(),
     )
     if np.sum(mask_pose) == 0:
-        return [None] * 3
+        return [None] * 2
     R = R.T
     t = -R @ t
-    return R, t, mask
+    mask = mask.astype(np.bool).ravel()
+    T = np.vstack(
+        (np.hstack((R, t)), [0, 0, 0, 1]),
+    )
+    return T, mask
 
 
 def create_point_triangulator(K):

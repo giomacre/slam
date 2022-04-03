@@ -34,7 +34,7 @@ def create_drawer_thread(
                 [
                     *islice(
                         reversed(pt.idxs.items()),
-                        n_segments,
+                        n_segments + 1,
                     )
                 ]
             )

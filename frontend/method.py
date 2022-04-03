@@ -7,24 +7,31 @@ def create_frontend(
     detector,
     tracker,
     epipolar_ransac,
+    undistort,
 ):
     context = ddict()
     context.last_frame = None
     context.current_keyframe = None
 
     def match_features(frame):
-        matches, train_idxs = tracker(
+        tracked, train_idxs = tracker(
             frame,
             context.last_frame,
         )
-        if len(matches) == 0:
+        if len(tracked) == 0:
             return [None] * 2
         # Filter outliers with RANSAC
-        _, inliers = epipolar_ransac(matches)
+        frame.key_pts = tracked
+        frame.undist = undistort(frame.key_pts)
+        _, inliers = epipolar_ransac(
+            frame.undist,
+            context.last_frame.undist[train_idxs],
+        )
         if inliers is None:
             return [None] * 2
         train_idxs = train_idxs[inliers]
-        frame.key_pts = matches[inliers, ..., 0]
+        frame.key_pts = frame.key_pts[inliers]
+        frame.undist = frame.undist[inliers]
         return frame, train_idxs
 
     def localization(frame, train_idxs):
@@ -35,13 +42,10 @@ def create_frontend(
         kf_idxs = np.array(
             [last_frame.observations[i].idxs[current_keyframe.id] for i in train_idxs]
         )
+
         S, inliers = epipolar_ransac(
-            np.dstack(
-                (
-                    frame.key_pts,
-                    context.current_keyframe.key_pts[kf_idxs],
-                )
-            )
+            frame.undist,
+            current_keyframe.undist[kf_idxs],
         )
         if S is None:
             return None
@@ -54,6 +58,7 @@ def create_frontend(
             frame.observations[i] = landmark
         frame.pose = S @ context.current_keyframe.pose
         frame.key_pts = frame.key_pts[inliers]
+        frame.undist = frame.undist[inliers]
         return frame
 
     def keyframe_recognition(frame):
