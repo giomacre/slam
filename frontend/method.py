@@ -1,3 +1,4 @@
+import enum
 from params import frontend_params
 import numpy as np
 from utils.decorators import ddict
@@ -42,30 +43,37 @@ def create_frontend(
         kf_idxs = np.array(
             [last_frame.observations[i].idxs[current_keyframe.id] for i in train_idxs]
         )
-
-        S, inliers = epipolar_ransac(
+        frame.observations = [None] * len(kf_idxs)
+        for i, kf_idx in enumerate(kf_idxs):
+            landmark = current_keyframe.observations[kf_idx]
+            landmark.idxs |= {frame.id: i}
+            frame.observations[i] = landmark
+        S, _ = epipolar_ransac(
             frame.undist,
             current_keyframe.undist[kf_idxs],
         )
         if S is None:
             return None
-        num_tracked = sum(inliers)
-        kf_idxs = kf_idxs[inliers]
-        frame.observations = [None] * num_tracked
-        for i in range(num_tracked):
-            landmark = context.current_keyframe.observations[kf_idxs[i]]
-            landmark.idxs |= {frame.id: i}
-            frame.observations[i] = landmark
         frame.pose = S @ context.current_keyframe.pose
-        frame.key_pts = frame.key_pts[inliers]
-        frame.undist = frame.undist[inliers]
         return frame
 
     def keyframe_recognition(frame):
+        current_landmarks = [lm for lm in frame.observations if lm.is_initialized]
+        kf_landmarks = [
+            lm for lm in context.current_keyframe.observations if lm.is_initialized
+        ]
         num_tracked = len(frame.key_pts)
         if (
-            num_tracked / len(context.current_keyframe.key_pts)
-            < frontend_params.kf_threshold
+            context.current_keyframe.id == 0
+            and (
+                num_tracked / len(context.current_keyframe.key_pts)
+                < frontend_params.kf_threshold
+            )
+            or (
+                context.current_keyframe.id > 0
+                and len(current_landmarks) / len(kf_landmarks)
+                < frontend_params.kf_threshold
+            )
         ):
             frame = detector(
                 frame,
