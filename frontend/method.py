@@ -1,5 +1,6 @@
 from functools import partial
 from operator import itemgetter
+from geometry import computeParallax
 from params import frontend_params
 import numpy as np
 
@@ -9,6 +10,7 @@ def create_frontend(
     tracker,
     epipolar_ransac,
     undistort,
+    average_parallax,
 ):
     context = dict(
         last_frame=None,
@@ -65,22 +67,27 @@ def create_frontend(
         frame.pose = S @ current_keyframe.pose
         return frame
 
-    def keyframe_recognition(frame):
+    def keyframe_recognition(frame, kf_idxs):
         _, current_keyframe = current_context()
-        current_landmarks = [lm for lm in frame.observations if lm.is_initialized]
-        kf_landmarks = [lm for lm in current_keyframe.observations if lm.is_initialized]
+        avg_parallax = average_parallax(
+            frame.pose,
+            current_keyframe.pose,
+            frame.undist,
+            current_keyframe.undist[kf_idxs],
+        )
+        current_landmarks = [
+            *(lm for lm in frame.observations if lm.is_initialized),
+        ]
+        kf_landmarks = [
+            *(lm for lm in current_keyframe.observations if lm.is_initialized),
+        ]
         num_tracked = len(frame.key_pts)
         if (
-            current_keyframe.id == 0
-            and (
-                num_tracked / len(current_keyframe.key_pts)
-                < frontend_params["kf_threshold"]
-            )
-            or (
-                current_keyframe.id > 0
-                and len(current_landmarks) / len(kf_landmarks)
-                < frontend_params["kf_threshold"]
-            )
+            avg_parallax > frontend_params["kf_avg_parallax"]
+            or current_keyframe.id > 0
+            and avg_parallax > frontend_params["kf_avg_parallax"] / 2.0
+            and len(current_landmarks) / len(kf_landmarks)
+            < frontend_params["kf_point_ratio"]
         ):
             frame = detector(
                 frame,
@@ -103,12 +110,12 @@ def create_frontend(
             context["current_keyframe"] = frame
             context["last_frame"] = frame
             return frame
-        frame, train_idxs = match_features(frame)
+        frame, kf_idxs = match_features(frame)
         if frame is None:
             return None
-        frame = localization(frame, train_idxs)
+        frame = localization(frame, kf_idxs)
         if frame is None:
             return None
-        return keyframe_recognition(frame)
+        return keyframe_recognition(frame, kf_idxs)
 
     return frontend

@@ -33,8 +33,13 @@ def to_camera_coords(K_inv, x):
 
 def to_image_coords(K, x):
     projected = K @ x
-    scaled = projected / projected.take(
-        indices=-1,
-        axis=np.arange(len(x.shape))[-2],
-    ).reshape((*x.shape[:-2], 1, x.shape[-1]))
-    return scaled[:, :2, ...]
+    scaled = projected / (
+        projected.take(indices=-1, axis=np.arange(len(x.shape))[-2],).reshape(
+            (
+                *x.shape[:-2],
+                1,
+                x.shape[-1],
+            )
+        )
+    )
+    return scaled[..., :2, :]

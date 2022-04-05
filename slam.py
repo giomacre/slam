@@ -8,6 +8,7 @@ import numpy as np
 from camera_calibration import (
     get_calibration_params,
     to_camera_coords,
+    to_image_coords,
 )
 from frontend.method import create_frontend
 from visualization.tracking import create_drawer_thread
@@ -18,6 +19,7 @@ from frontend.optical_flow import (
 )
 from frontend.video import Video
 from geometry import (
+    computeParallax,
     create_point_triangulator,
     epipolar_ransac,
 )
@@ -38,15 +40,26 @@ if __name__ == "__main__":
 
     video_stream = video.get_video_stream()
     K, Kinv, d = get_calibration_params()
-    undistort = lambda kp: undistortPoints(kp, K, d, R=np.eye(3), P=K).squeeze()
+    undistort = lambda kp: undistortPoints(
+        kp,
+        K,
+        d,
+        R=np.eye(3),
+        P=K,
+    ).squeeze()
     detector = create_lk_orb_detector(undistort)
     tracker = track_to_new_frame
-    epipolar_localizer = partial(epipolar_ransac,K)
+    epipolar_localizer = partial(epipolar_ransac, K)
     frontend = create_frontend(
         detector,
         tracker,
         epipolar_localizer,
         undistort,
+        partial(
+            computeParallax,
+            lambda x: to_camera_coords(Kinv, x.T).T,
+            partial(to_image_coords, K),
+        ),
     )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(

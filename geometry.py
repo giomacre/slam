@@ -5,8 +5,8 @@ from camera_calibration import to_image_coords
 from utils.slam_logging import log_pose_estimation, log_triangulation
 
 
-@log_pose_estimation
-def epipolar_ransac(K,query_pts, train_pts):
+# @log_pose_estimation
+def epipolar_ransac(K, query_pts, train_pts):
     E, mask = cv.findEssentialMat(
         train_pts,
         query_pts,
@@ -102,3 +102,24 @@ def to_extrinsics(camera_pose):
         ),
     )
     return world_to_camera
+
+
+def computeParallax(
+    to_camera_frame,
+    to_image_frame,
+    current_pose,
+    reference_pose,
+    current_points,
+    reference_points,
+):
+    back_projection = to_image_frame(
+        reference_pose[:3, :3].T
+        @ current_pose[:3, :3]
+        @ to_camera_frame(current_points).T
+    ).T
+    return np.mean(
+        np.linalg.norm(
+            back_projection - reference_points,
+            axis=1,
+        )
+    )

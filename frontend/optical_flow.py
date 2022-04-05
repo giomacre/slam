@@ -33,7 +33,7 @@ def create_lk_orb_detector(undistort, **orb_args):
     return detector
 
 
-@log_feature_match
+# @log_feature_match
 def track_to_new_frame(query_frame, train_frame):
     train_pts = train_frame.key_pts.reshape(-1, 1, 2).copy()
     query_gray, train_gray = (
