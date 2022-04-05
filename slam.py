@@ -52,7 +52,6 @@ if __name__ == "__main__":
     send_map_task = create_map_thread(
         (800, 600),
         Kinv,
-        (width, height),
         thread_context,
     )
     thread_context.start()

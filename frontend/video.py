@@ -1,7 +1,4 @@
-from functools import wraps
 import cv2 as cv
-from utils.decorators import ddict
-from frontend.frame import create_frame
 
 
 def skip_items(

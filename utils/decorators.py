@@ -1,24 +1,6 @@
 from collections import deque
 from functools import reduce, wraps
 
-
-class ddict(dict):
-    __getattr__ = (
-        lambda *args: item
-        if type(item := dict.__getitem__(*args)) is not dict
-        else ddict(item)
-    )
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-    __dir__ = dict.keys
-
-    def __getstate__(self):
-        return self.__dict__
-
-    def __setstate__(self, dict):
-        self.__dict__ = dict
-
-
 def use_arguments(decorator):
     def pass_parameters(*args, **kwargs):
         def with_parameters(function):

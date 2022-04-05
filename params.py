@@ -1,7 +1,4 @@
-from utils.decorators import ddict
-
-
-camera_params = ddict(
+camera_params = dict(
     fx=517.3,
     fy=520.9,
     cx=318.6,
@@ -11,10 +8,9 @@ camera_params = ddict(
     p1=-0.0054,
     p2=0.0026,
     k3=1.1633,
-    alpha=1.0,
 )
 
-frontend_params = ddict(
+frontend_params = dict(
     n_features=500,
     kf_threshold=0.75,
 )

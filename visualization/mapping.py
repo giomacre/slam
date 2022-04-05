@@ -1,8 +1,9 @@
 from functools import partial
+from operator import itemgetter
 import os
 import sys
 from utils.worker import create_worker
-from utils.decorators import ddict, stateful_decorator
+from utils.decorators import stateful_decorator
 import numpy as np
 
 sys.path.append(
@@ -15,13 +16,20 @@ import pypangolin as pango
 import OpenGL.GL as gl
 
 
-def create_map_thread(windows_size, Kinv, video_size, thread_context):
-    render_context = ddict(
+def create_map_thread(windows_size, Kinv, thread_context):
+    context = dict(
         render_state=None,
         display=None,
     )
-    setup_window = partial(setup_pangolin, *windows_size, render_context)
-
+    render_context = partial(
+        itemgetter("render_state", "display"),
+        context,
+    )
+    setup_window = partial(
+        setup_pangolin,
+        *windows_size,
+        context,
+    )
     decorator = stateful_decorator(needs=1)
     visualization_loop = decorator(
         partial(
@@ -50,15 +58,16 @@ def create_map_thread(windows_size, Kinv, video_size, thread_context):
 
 
 def draw_map(
-    context,
+    render_context,
     Kinv,
     video_size,
     poses,
     points=None,
     colors=None,
 ):
+    render_state, display = render_context()
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-    context.display.Activate(context.render_state)
+    display.Activate(render_state)
     gl.glColor(1.0, 0.85, 0.3)
     gl.glLineWidth(1)
     for pose in poses[:-1]:
@@ -125,5 +134,5 @@ def setup_pangolin(
     )
     handler = pango.Handler3D(render_state)
     display = pango.CreateDisplay().SetAspect(width / height).SetHandler(handler)
-    context.render_state = render_state
-    context.display = display
+    context["render_state"] = render_state
+    context["display"] = display
