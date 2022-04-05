@@ -86,6 +86,7 @@ def create_frontend(
             avg_parallax > frontend_params["kf_avg_parallax"]
             or current_keyframe.id > 0
             and avg_parallax > frontend_params["kf_avg_parallax"] / 2.0
+            and num_tracked < frontend_params["n_features"] / 2.0
             and len(current_landmarks) / len(kf_landmarks)
             < frontend_params["kf_point_ratio"]
         ):
