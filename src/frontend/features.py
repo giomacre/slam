@@ -22,10 +22,11 @@ def create_orb_detector(undistort, **orb_args):
     orb = cv.ORB_create(**orb_args)
     detector = cv.FastFeatureDetector_create()
 
-    @log_feature_extraction
+    # @log_feature_extraction
     def orb_detector(frame, max_features=None, mask=None):
         if max_features is not None:
             orb.setMaxFeatures(max_features)
+        n_extracted = 0
         key_pts = []
         if orb.getMaxFeatures() > 0:
             key_pts = detector.detect(frame.image, mask=mask)
@@ -45,6 +46,7 @@ def create_orb_detector(undistort, **orb_args):
                 frame.image.shape[1],
                 frame.image.shape[0],
             )
+            n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
             undist = undistort(key_pts)
             observations = [
@@ -78,6 +80,6 @@ def create_orb_detector(undistort, **orb_args):
             frame.image,
             cv.KeyPoint_convert(frame.key_pts),
         )[1]
-        return frame
+        return n_extracted, frame
 
     return orb_detector

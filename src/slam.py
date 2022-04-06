@@ -1,3 +1,4 @@
+from collections import deque
 from functools import partial
 from typing import DefaultDict
 from cv2 import undistortPoints
@@ -7,9 +8,10 @@ from .frontend.camera_calibration import (
     get_calibration_params,
     computeParallax,
 )
+from .utils.params import frontend_params
 from .frontend.method import create_frontend
 from .frontend.frame import create_frame
-from .frontend.optical_flow import (
+from .frontend.klt import (
     create_lk_orb_detector,
     track_to_new_frame,
 )
@@ -26,7 +28,7 @@ from .visualization.tracking import create_drawer_thread
 np.set_printoptions(precision=3, suppress=True)
 
 
-def main(argv):
+def main():
     from argparse import ArgumentParser, ArgumentTypeError
 
     def check_file(path):
@@ -46,7 +48,6 @@ def main(argv):
     video = Video(args.video_path)
     video_stream = video.get_video_stream()
 
-
     K, Kinv, d = get_calibration_params()
     undistort = lambda kp: undistortPoints(
         kp,
@@ -55,6 +56,7 @@ def main(argv):
         R=np.eye(3),
         P=K,
     ).squeeze()
+
     detector = create_lk_orb_detector(undistort)
     tracker = track_to_new_frame
     epipolar_localizer = partial(epipolar_ransac, K)
@@ -66,6 +68,7 @@ def main(argv):
         partial(computeParallax, K, Kinv),
         partial(pnp_ransac, K),
     )
+
     triangulation = create_point_triangulator(K)
 
     thread_context = create_thread_context()
@@ -80,7 +83,6 @@ def main(argv):
     frames = video_stream
     tracked_frames = []
     map_points = []
-    last_keyframe = None
     for image in frames:
         frame = create_frame(len(tracked_frames), image)
         frame = frontend(frame)
@@ -108,6 +110,7 @@ def main(argv):
                     frame.undist[curr_idxs],
                     tracked_frames[f_id].undist[ref_idxs],
                 )
+                map_points = []
                 for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):
                     to_idx = lambda kp: tuple(np.rint(kp).astype(int)[::-1])
                     landmark = frame.observations[i]

@@ -1,7 +1,10 @@
 from functools import partial
+from itertools import islice
 from operator import itemgetter
 import os
 import sys
+
+from src.utils.slam_logging import performance_timer
 from ..utils.worker import create_worker
 from ..utils.decorators import stateful_decorator
 
@@ -19,9 +22,12 @@ def create_map_thread(windows_size, Kinv, thread_context):
     context = dict(
         render_state=None,
         display=None,
+        poses=[],
+        positions=[],
+        map_points=([], []),
     )
     render_context = partial(
-        itemgetter("render_state", "display"),
+        itemgetter(*iter(context.keys())),
         context,
     )
     setup_window = partial(
@@ -30,13 +36,11 @@ def create_map_thread(windows_size, Kinv, thread_context):
         context,
     )
     decorator = stateful_decorator(needs=1)
-    visualization_loop = decorator(
-        partial(
-            draw_map,
-            render_context,
-            Kinv,
-            windows_size,
-        )
+    visualization_loop = partial(
+        draw_map,
+        render_context,
+        Kinv,
+        windows_size,
     )
     worker = create_worker(
         visualization_loop,
@@ -47,10 +51,13 @@ def create_map_thread(windows_size, Kinv, thread_context):
         name="PyPangolinViewer",
     )
 
-    def prepare_task(frames, points):
+    # @performance_timer()
+    def prepare_task(frames, new_points):
+        pose = frames[-1].pose
+        map_points = [(p.coords, p.color) for p in new_points]
         return worker(
-            [f.pose for f in frames],
-            *zip(*((p.coords, p.color) for p in points)),
+            pose,
+            map_points,
         )
 
     return prepare_task
@@ -60,30 +67,38 @@ def draw_map(
     render_context,
     Kinv,
     video_size,
-    poses,
-    points=None,
-    colors=None,
+    pose=None,
+    new_points=None,
 ):
-    render_state, display = render_context()
+    (
+        render_state,
+        display,
+        poses,
+        positions,
+        (pt_coords, colors),
+    ) = render_context()
+    if pose is not None:
+        poses += [pose]
+        positions += [pose[:3, 3:]]
+        if len(new_points) > 0:
+            new_coords, new_colors = zip(*new_points)
+            pt_coords.extend(new_coords)
+            colors.extend(new_colors)
+
+    if len(poses) == 0:
+        return
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
     display.Activate(render_state)
     gl.glColor(1.0, 0.85, 0.3)
     gl.glLineWidth(1)
-    # for pose in poses[:-1]:
-    #     pango.glDrawFrustum(
-    #         Kinv,
-    #         *video_size,
-    #         pose,
-    #         0.25,
-    #     )
-    pango.glDrawLineStrip(
-        [
-            *map(
-                lambda p: p[:3, 3:],
-                poses,
-            )
-        ]
-    )
+    for pose in poses[:-1]:
+        pango.glDrawFrustum(
+            Kinv,
+            *video_size,
+            pose,
+            0.05,
+        )
+    pango.glDrawLineStrip(positions)
     gl.glLineWidth(2)
     gl.glColor(0.4, 0.0, 1.0)
     pango.glDrawFrustum(
@@ -92,10 +107,9 @@ def draw_map(
         poses[-1],
         0.25,
     )
-    gl.glPointSize(2)
-    if points is not None:
-        pango.DrawPoints(points, colors)
-
+    if len(pt_coords) > 0:
+        gl.glPointSize(2)
+        pango.DrawPoints(pt_coords, colors)
     pango.FinishFrame()
 
 

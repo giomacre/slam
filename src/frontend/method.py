@@ -102,7 +102,6 @@ def create_frontend(
             frame.undist,
             current_keyframe.undist[kf_idxs],
         )
-        print(avg_parallax)
         current_landmarks = [
             *(lm for lm in frame.observations if lm.is_initialized),
         ]
@@ -118,11 +117,11 @@ def create_frontend(
             and len(current_landmarks) / len(kf_landmarks)
             < frontend_params["kf_point_ratio"]
         ):
-            frame = detector(
+            n_ret, frame = detector(
                 frame,
                 frontend_params["n_features"] - num_tracked,
             )
-            if len(frame.key_pts) == num_tracked:
+            if n_ret == 0:
                 return None
             frame.is_keyframe = True
             context["current_keyframe"] = frame
@@ -131,8 +130,8 @@ def create_frontend(
 
     def frontend(frame):
         if frame.id == 0:
-            frame = detector(frame, frontend_params["n_features"])
-            if len(frame.key_pts) == 0:
+            n_ret, frame = detector(frame, frontend_params["n_features"])
+            if n_ret == 0:
                 return None
             frame.pose = np.eye(4)
             frame.is_keyframe = True

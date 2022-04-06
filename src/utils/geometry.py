@@ -40,6 +40,7 @@ def pnp_ransac(K, lm_coords, image_coords):
         image_coords,
         K,
         distCoeffs=None,
+        reprojectionError=8.0,
     )
     if not retval:
         return [None] * 2
@@ -85,7 +86,7 @@ def create_point_triangulator(K):
         low_err = reduce(
             np.bitwise_and,
             (
-                np.linalg.norm(a - b.T, axis=0) < 5.0
+                np.linalg.norm(a - b.T, axis=0) < 8.0
                 for a, b in zip(
                     projected,
                     [current_points, reference_points],
