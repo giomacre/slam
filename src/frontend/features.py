@@ -2,8 +2,8 @@ import os
 import sys
 import cv2 as cv
 import numpy as np
-from mapping.point import create_point
-from utils.slam_logging import log_feature_match, log_feature_extraction
+from ..mapping.point import create_point
+from ..utils.slam_logging import log_feature_match, log_feature_extraction
 
 sys.path.append(
     os.path.join(

@@ -1,7 +1,6 @@
-from audioop import reverse
 from functools import partial
 from operator import itemgetter
-from params import frontend_params
+from ..utils.params import frontend_params
 import numpy as np
 
 

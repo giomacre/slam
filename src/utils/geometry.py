@@ -1,8 +1,8 @@
 from functools import reduce
 import numpy as np
 import cv2 as cv
-from camera_calibration import to_image_coords
-from utils.slam_logging import log_pose_estimation, log_triangulation
+from ..frontend.camera_calibration import to_image_coords
+from .slam_logging import log_pose_estimation, log_triangulation
 
 
 # @log_pose_estimation
@@ -60,8 +60,8 @@ def create_point_triangulator(K):
         current_points,
         reference_points,
     ):
-        current_extrinsics = invert_pose(current_pose)
-        reference_extrinsics = invert_pose(reference_pose)
+        current_extrinsics = np.linalg.inv(current_pose)
+        reference_extrinsics = np.linalg.inv(reference_pose)
         points_4d = np.array(
             cv.triangulatePoints(
                 (K @ reference_extrinsics),
@@ -106,18 +106,3 @@ def construct_pose(R, t):
     return np.vstack(
         (np.hstack((R, t)), [0, 0, 0, 1]),
     )
-
-
-def invert_pose(camera_pose):
-    world_to_camera = np.vstack(
-        (
-            np.hstack(
-                (
-                    camera_pose[:3, :3].T,
-                    -camera_pose[:3, :3].T @ camera_pose[:3, 3:],
-                )
-            ),
-            [0, 0, 0, 1],
-        ),
-    )
-    return world_to_camera

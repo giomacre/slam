@@ -1,8 +1,8 @@
 import cv2 as cv
 from functools import reduce
 import numpy as np
-from frontend.features import create_orb_detector
-from utils.slam_logging import log_feature_match
+from .features import create_orb_detector
+from ..utils.slam_logging import log_feature_match
 
 
 def create_lk_orb_detector(undistort, **orb_args):

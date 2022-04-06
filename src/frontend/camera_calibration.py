@@ -1,4 +1,4 @@
-from params import camera_params
+from ..utils.params import camera_params
 import numpy as np
 
 

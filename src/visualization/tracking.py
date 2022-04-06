@@ -1,12 +1,9 @@
-from concurrent.futures import thread
 from functools import partial
 from itertools import islice
-from time import sleep
 import cv2 as cv
 import numpy as np
-from utils.decorators import stateful_decorator
-
-from utils.worker import create_worker
+from ..utils.decorators import stateful_decorator
+from ..utils.worker import create_worker
 
 
 def create_drawer_thread(

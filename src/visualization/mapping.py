@@ -2,9 +2,8 @@ from functools import partial
 from operator import itemgetter
 import os
 import sys
-from utils.worker import create_worker
-from utils.decorators import stateful_decorator
-import numpy as np
+from ..utils.worker import create_worker
+from ..utils.decorators import stateful_decorator
 
 sys.path.append(
     os.path.join(

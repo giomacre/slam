@@ -1,45 +1,52 @@
-#!/usr/bin/env python3
-
 from functools import partial
-import sys
 from typing import DefaultDict
 from cv2 import undistortPoints
 import numpy as np
-from camera_calibration import (
+from threading import current_thread
+from .frontend.camera_calibration import (
     get_calibration_params,
-    to_camera_coords,
-    to_image_coords,
     computeParallax,
 )
-from frontend.method import create_frontend
-from visualization.tracking import create_drawer_thread
-from frontend.frame import create_frame
-from frontend.optical_flow import (
+from .frontend.method import create_frontend
+from .frontend.frame import create_frame
+from .frontend.optical_flow import (
     create_lk_orb_detector,
     track_to_new_frame,
 )
-from frontend.video import Video
-from geometry import (
+from .frontend.video import Video
+from .utils.geometry import (
     create_point_triangulator,
     epipolar_ransac,
     pnp_ransac,
 )
-from visualization.mapping import create_map_thread
-from utils.worker import create_thread_context
-from threading import current_thread
+from .utils.worker import create_thread_context
+from .visualization.mapping import create_map_thread
+from .visualization.tracking import create_drawer_thread
 
 np.set_printoptions(precision=3, suppress=True)
 
 
-if __name__ == "__main__":
-    video_path = sys.argv[1]
-    video = Video(video_path)
-    width, height = video.width, video.height
+def main(argv):
+    from argparse import ArgumentParser, ArgumentTypeError
 
-    thread_context = create_thread_context()
-    send_draw_task = create_drawer_thread(thread_context)
+    def check_file(path):
+        from cv2 import VideoCapture
 
+        video = VideoCapture(path)
+        if video.isOpened():
+            return path
+        raise ArgumentTypeError(f"{path} is not a valid file.")
+
+    parser = ArgumentParser()
+    parser.add_argument(
+        "video_path",
+        type=check_file,
+    )
+    args = parser.parse_args()
+    video = Video(args.video_path)
     video_stream = video.get_video_stream()
+
+
     K, Kinv, d = get_calibration_params()
     undistort = lambda kp: undistortPoints(
         kp,
@@ -60,13 +67,16 @@ if __name__ == "__main__":
         partial(pnp_ransac, K),
     )
     triangulation = create_point_triangulator(K)
+
+    thread_context = create_thread_context()
+    send_draw_task = create_drawer_thread(thread_context)
     send_map_task = create_map_thread(
         (800, 600),
         Kinv,
         thread_context,
     )
-    thread_context.start()
 
+    thread_context.start()
     frames = video_stream
     tracked_frames = []
     map_points = []
@@ -117,3 +127,9 @@ if __name__ == "__main__":
     thread_context.cleanup()
     thread_context.join_all()
     print(f"{current_thread()} exiting.")
+
+
+if __name__ == "__main__":
+    from sys import argv
+
+    main(argv)
