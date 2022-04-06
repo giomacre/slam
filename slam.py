@@ -9,6 +9,7 @@ from camera_calibration import (
     get_calibration_params,
     to_camera_coords,
     to_image_coords,
+    computeParallax,
 )
 from frontend.method import create_frontend
 from visualization.tracking import create_drawer_thread
@@ -19,9 +20,9 @@ from frontend.optical_flow import (
 )
 from frontend.video import Video
 from geometry import (
-    computeParallax,
     create_point_triangulator,
     epipolar_ransac,
+    pnp_ransac,
 )
 from visualization.mapping import create_map_thread
 from utils.worker import create_thread_context
@@ -55,11 +56,8 @@ if __name__ == "__main__":
         tracker,
         epipolar_localizer,
         undistort,
-        partial(
-            computeParallax,
-            lambda x: to_camera_coords(Kinv, x.T).T,
-            partial(to_image_coords, K),
-        ),
+        partial(computeParallax, K, Kinv),
+        partial(pnp_ransac, K),
     )
     triangulation = create_point_triangulator(K)
     send_map_task = create_map_thread(
@@ -81,14 +79,13 @@ if __name__ == "__main__":
         tracked_frames += [frame]
         if frame.is_keyframe:
             candidate_pts = [
-                lm
-                for lm in frame.observations
+                (id, lm)
+                for id, lm in enumerate(frame.observations)
                 if not lm.is_initialized and len(lm.idxs) > 1
             ]
             matches = DefaultDict(lambda: [[], []])
-            for lm in candidate_pts:
+            for curr_idx, lm in candidate_pts:
                 id, idx = next(x for x in lm.idxs.items())
-                curr_idx = next(reversed(lm.idxs.values()))
                 ref_idxs, curr_idxs = matches[id]
                 ref_idxs += [idx]
                 curr_idxs += [curr_idx]
@@ -110,10 +107,12 @@ if __name__ == "__main__":
                     landmark.is_initialized = True
                     map_points += [landmark]
 
-        send_draw_task(tracked_frames)
-        send_map_task(tracked_frames, map_points)
+        await_draw = send_draw_task(tracked_frames)
+        await_map = send_map_task(tracked_frames, map_points)
         if thread_context.is_closed:
             break
+        # await_draw()
+        # await_map()
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()

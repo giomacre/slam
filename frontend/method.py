@@ -1,6 +1,6 @@
+from audioop import reverse
 from functools import partial
 from operator import itemgetter
-from geometry import computeParallax
 from params import frontend_params
 import numpy as np
 
@@ -11,6 +11,7 @@ def create_frontend(
     epipolar_ransac,
     undistort,
     average_parallax,
+    pnp_ransac,
 ):
     context = dict(
         last_frame=None,
@@ -28,7 +29,7 @@ def create_frontend(
             last_frame,
         )
         if len(tracked) == 0:
-            return [None] * 2
+            return [None] * 3
         # Filter outliers with RANSAC
         frame.key_pts = tracked
         frame.undist = undistort(frame.key_pts)
@@ -37,7 +38,7 @@ def create_frontend(
             last_frame.undist[train_idxs],
         )
         if inliers is None:
-            return [None] * 2
+            return [None] * 3
         train_idxs = train_idxs[inliers]
         frame.key_pts = frame.key_pts[inliers]
         frame.undist = frame.undist[inliers]
@@ -49,23 +50,50 @@ def create_frontend(
                 )
             ]
         )
-        return frame, kf_idxs
+        observations = [current_keyframe.observations[i] for i in kf_idxs]
+        return frame, kf_idxs, observations
 
-    def localization(frame, kf_idxs):
+    def localization(frame, kf_idxs, observations):
         _, current_keyframe = current_context()
+        pts_3d, idxs_3d = [[]] * 2
+        values = tuple(
+            np.array(a)
+            for a in zip(
+                *(
+                    (lm.coords, idx)
+                    for idx, lm in enumerate(observations)
+                    if lm.is_initialized
+                )
+            )
+        )
+        if len(values) > 0:
+            pts_3d, idxs_3d = values
+        if len(pts_3d) < 4:
+            T, inliers = epipolar_ransac(
+                frame.undist,
+                current_keyframe.undist[kf_idxs],
+            )
+            if T is None:
+                return [None] * 2
+            frame.pose = T @ current_keyframe.pose
+        else:
+            T, mask = pnp_ransac(pts_3d, frame.undist[idxs_3d])
+            if T is None:
+                return [None] * 2
+            outliers = idxs_3d[~mask]
+            inliers = np.full(len(frame.key_pts), True)
+            inliers[outliers] = False
+            frame.pose = T
+        frame.key_pts = frame.key_pts[inliers]
+        frame.undist = frame.undist[inliers]
+        kf_idxs = kf_idxs[inliers]
         frame.observations = [None] * len(kf_idxs)
         for i, kf_idx in enumerate(kf_idxs):
             landmark = current_keyframe.observations[kf_idx]
             landmark.idxs |= {frame.id: i}
             frame.observations[i] = landmark
-        S, _ = epipolar_ransac(
-            frame.undist,
-            current_keyframe.undist[kf_idxs],
-        )
-        if S is None:
-            return None
-        frame.pose = S @ current_keyframe.pose
-        return frame
+
+        return frame, kf_idxs
 
     def keyframe_recognition(frame, kf_idxs):
         _, current_keyframe = current_context()
@@ -75,6 +103,7 @@ def create_frontend(
             frame.undist,
             current_keyframe.undist[kf_idxs],
         )
+        print(avg_parallax)
         current_landmarks = [
             *(lm for lm in frame.observations if lm.is_initialized),
         ]
@@ -111,10 +140,10 @@ def create_frontend(
             context["current_keyframe"] = frame
             context["last_frame"] = frame
             return frame
-        frame, kf_idxs = match_features(frame)
+        frame, kf_idxs, observations = match_features(frame)
         if frame is None:
             return None
-        frame = localization(frame, kf_idxs)
+        frame, kf_idxs = localization(frame, kf_idxs, observations)
         if frame is None:
             return None
         return keyframe_recognition(frame, kf_idxs)

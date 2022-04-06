@@ -11,6 +11,7 @@ def epipolar_ransac(K, query_pts, train_pts):
         train_pts,
         query_pts,
         K,
+        prob=0.999,
     )
     if E is None:
         return [None] * 2
@@ -28,12 +29,24 @@ def epipolar_ransac(K, query_pts, train_pts):
     )
     if np.sum(mask_pose) == 0:
         return [None] * 2
-    R = R.T
-    t = -R @ t
+    T = construct_pose(R.T, -R.T @ t * 0.25)
     mask = mask.astype(np.bool).ravel()
-    T = np.vstack(
-        (np.hstack((R, t)), [0, 0, 0, 1]),
+    return T, mask
+
+
+def pnp_ransac(K, lm_coords, image_coords):
+    retval, retvec, tvec, inliers = cv.solvePnPRansac(
+        lm_coords,
+        image_coords,
+        K,
+        distCoeffs=None,
     )
+    if not retval:
+        return [None] * 2
+    R = cv.Rodrigues(retvec)[0].T
+    T = construct_pose(R, -R @ tvec)
+    mask = np.full(len(lm_coords), False)
+    mask[inliers.flatten()] = True
     return T, mask
 
 
@@ -47,8 +60,8 @@ def create_point_triangulator(K):
         current_points,
         reference_points,
     ):
-        current_extrinsics = to_extrinsics(current_pose)
-        reference_extrinsics = to_extrinsics(reference_pose)
+        current_extrinsics = invert_pose(current_pose)
+        reference_extrinsics = invert_pose(reference_pose)
         points_4d = np.array(
             cv.triangulatePoints(
                 (K @ reference_extrinsics),
@@ -89,7 +102,13 @@ def create_point_triangulator(K):
     return triangulation
 
 
-def to_extrinsics(camera_pose):
+def construct_pose(R, t):
+    return np.vstack(
+        (np.hstack((R, t)), [0, 0, 0, 1]),
+    )
+
+
+def invert_pose(camera_pose):
     world_to_camera = np.vstack(
         (
             np.hstack(
@@ -102,24 +121,3 @@ def to_extrinsics(camera_pose):
         ),
     )
     return world_to_camera
-
-
-def computeParallax(
-    to_camera_frame,
-    to_image_frame,
-    current_pose,
-    reference_pose,
-    current_points,
-    reference_points,
-):
-    back_projection = to_image_frame(
-        reference_pose[:3, :3].T
-        @ current_pose[:3, :3]
-        @ to_camera_frame(current_points).T
-    ).T
-    return np.mean(
-        np.linalg.norm(
-            back_projection - reference_points,
-            axis=1,
-        )
-    )
