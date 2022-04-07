@@ -11,7 +11,9 @@ camera_params = dict(
 )
 
 frontend_params = dict(
-    n_features=250,
-    kf_point_ratio=0.75,
-    kf_avg_parallax=20.0,
+    max_features=200,
+    min_features=40,
+    kf_landmark_ratio=0.75,
+    kf_parallax_threshold=20.0,
+    epipolar_scale=0.25,
 )

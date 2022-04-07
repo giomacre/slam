@@ -3,6 +3,7 @@ from itertools import islice
 from operator import itemgetter
 import os
 import sys
+import numpy as np
 
 from src.utils.slam_logging import performance_timer
 from ..utils.worker import create_worker
@@ -24,7 +25,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
         display=None,
         poses=[],
         positions=[],
-        map_points=([], []),
+        map_points={"coords": [], "colors": []},
     )
     render_context = partial(
         itemgetter(*iter(context.keys())),
@@ -35,7 +36,6 @@ def create_map_thread(windows_size, Kinv, thread_context):
         *windows_size,
         context,
     )
-    decorator = stateful_decorator(needs=1)
     visualization_loop = partial(
         draw_map,
         render_context,
@@ -75,15 +75,15 @@ def draw_map(
         display,
         poses,
         positions,
-        (pt_coords, colors),
+        map_points,
     ) = render_context()
     if pose is not None:
         poses += [pose]
         positions += [pose[:3, 3:]]
         if len(new_points) > 0:
             new_coords, new_colors = zip(*new_points)
-            pt_coords.extend(new_coords)
-            colors.extend(new_colors)
+            map_points["coords"] = new_coords
+            map_points["colors"] = new_colors
 
     if len(poses) == 0:
         return
@@ -91,13 +91,13 @@ def draw_map(
     display.Activate(render_state)
     gl.glColor(1.0, 0.85, 0.3)
     gl.glLineWidth(1)
-    for pose in poses[:-1]:
-        pango.glDrawFrustum(
-            Kinv,
-            *video_size,
-            pose,
-            0.05,
-        )
+    # for pose in poses[:-1]:
+    #     pango.glDrawFrustum(
+    #         Kinv,
+    #         *video_size,
+    #         pose,
+    #         0.01,
+    #     )
     pango.glDrawLineStrip(positions)
     gl.glLineWidth(2)
     gl.glColor(0.4, 0.0, 1.0)
@@ -107,9 +107,9 @@ def draw_map(
         poses[-1],
         0.25,
     )
-    if len(pt_coords) > 0:
+    if len(map_points["coords"]) > 0:
         gl.glPointSize(2)
-        pango.DrawPoints(pt_coords, colors)
+        pango.DrawPoints(map_points["coords"], map_points["colors"])
     pango.FinishFrame()
 
 
@@ -120,7 +120,7 @@ def setup_pangolin(
     focal_length=500,
     z_near=0.1,
     z_far=1000,
-    camera_pos=[2.0, -5.0, -2.0],
+    camera_pos=[2.5, -10.0, -15.0],
     target=[0.0, 0.5, 0.5],
     up_direction=[0.0, -1.0, 0.0],
 ):

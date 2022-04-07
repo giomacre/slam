@@ -2,49 +2,71 @@ from functools import reduce
 import numpy as np
 import cv2 as cv
 from ..frontend.camera_calibration import to_image_coords
-from .slam_logging import log_pose_estimation, log_triangulation
+from .slam_logging import log_pose_estimation, log_triangulation, performance_timer
+from .params import frontend_params
 
 
 # @log_pose_estimation
 def epipolar_ransac(K, query_pts, train_pts):
+    if len(train_pts) < 5:
+        return [None] * 2
     E, mask = cv.findEssentialMat(
         train_pts,
         query_pts,
         K,
         prob=0.999,
+        threshold=3.0,
     )
-    if E is None:
+    n_inliers = np.count_nonzero(mask)
+    # if n_inliers < 6 or n_inliers < len(train_pts) / 2:
+    if n_inliers < 6:
         return [None] * 2
-    # train_pts, query_pts = cv.correctMatches(
-    #     E,
-    #     train_pts[None, ...],
-    #     query_pts[None, ...],
-    # )
+    train_refined, query_refined = cv.correctMatches(
+        E,
+        train_pts[None, ...],
+        query_pts[None, ...],
+    )
     _, R, t, mask_pose = cv.recoverPose(
         E,
-        train_pts,
-        query_pts,
+        train_refined,
+        query_refined,
         K,
         mask=mask.copy(),
     )
-    if np.sum(mask_pose) == 0:
-        return [None] * 2
-    T = construct_pose(R.T, -R.T @ t * 0.25)
+    # if np.count_nonzero(mask_pose) < 6:
+    #     return [None] * 2
+    T = construct_pose(R.T, -R.T @ t * frontend_params["epipolar_scale"])
     mask = mask.astype(np.bool).ravel()
     return T, mask
 
 
 def pnp_ransac(K, lm_coords, image_coords):
-    retval, retvec, tvec, inliers = cv.solvePnPRansac(
+    retval, rotvec, tvec, inliers = cv.solvePnPRansac(
         lm_coords,
         image_coords,
         K,
         distCoeffs=None,
-        reprojectionError=8.0,
+        reprojectionError=3.0,
+        confidence=0.999,
+        iterationsCount=1000,
+        flags=cv.SOLVEPNP_P3P,
     )
-    if not retval:
+    if not retval or len(inliers) < 5:
         return [None] * 2
-    R = cv.Rodrigues(retvec)[0].T
+    _, rotvec, tvec, _ = cv.solvePnPRansac(
+        lm_coords[inliers],
+        image_coords[inliers],
+        K,
+        None,
+        rotvec,
+        tvec,
+        reprojectionError=3.0,
+        confidence=0.999,
+        iterationsCount=1000,
+        useExtrinsicGuess=True,
+        flags=cv.SOLVEPNP_ITERATIVE,
+    )
+    R = cv.Rodrigues(rotvec)[0].T
     T = construct_pose(R, -R @ tvec)
     mask = np.full(len(lm_coords), False)
     mask[inliers.flatten()] = True
@@ -86,7 +108,7 @@ def create_point_triangulator(K):
         low_err = reduce(
             np.bitwise_and,
             (
-                np.linalg.norm(a - b.T, axis=0) < 8.0
+                np.linalg.norm(a - b.T, axis=0) < 3.0
                 for a, b in zip(
                     projected,
                     [current_points, reference_points],

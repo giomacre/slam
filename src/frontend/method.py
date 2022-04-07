@@ -27,20 +27,20 @@ def create_frontend(
             frame,
             last_frame,
         )
-        if len(tracked) == 0:
-            return [None] * 2
         # Filter outliers with RANSAC
         frame.key_pts = tracked
         frame.undist = undistort(frame.key_pts)
-        _, inliers = epipolar_ransac(
+        T, inliers = epipolar_ransac(
             frame.undist,
             last_frame.undist[train_idxs],
         )
-        if inliers is None:
-            return [None] * 2
-        train_idxs = train_idxs[inliers]
-        frame.key_pts = frame.key_pts[inliers]
-        frame.undist = frame.undist[inliers]
+        if T is None:
+            print("Ess. Matrix failed")
+        if inliers is not None:
+            train_idxs = train_idxs[inliers]
+            frame.key_pts = frame.key_pts[inliers]
+            frame.undist = frame.undist[inliers]
+            frame.pose = T @ last_frame.pose
         kf_idxs = np.array(
             [
                 *(
@@ -67,30 +67,29 @@ def create_frontend(
         )
         if len(values) > 0:
             pts_3d, idxs_3d = values
-        if len(pts_3d) < 4:
-            print("ESS.MAT.")
-            print(f"{len(kf_idxs)=}\n{len(pts_3d)=}")
-            T, inliers = epipolar_ransac(
-                frame.undist,
-                current_keyframe.undist[kf_idxs],
-            )
-            # print(f"{T=}\n{np.count_nonzero(inliers)=}\n{current_keyframe.pose=}")
-            if T is None:
-                return [None] * 2
-            frame.pose = T @ current_keyframe.pose
-        else:
+        if len(pts_3d) >= 4:
             # print("PnP RANSAC")
             T, mask = pnp_ransac(pts_3d, frame.undist[idxs_3d])
             # print(f"{T=}\n{np.count_nonzero(mask)=}\n{current_keyframe.pose=}")
+            frame.key_pts, frame.undist, frame.desc
             if T is None:
-                return [None] * 2
+                print("PnP tracking failed")
+                (
+                    frame.key_pts,
+                    frame.undist,
+                    frame.desc,
+                ) = [np.array([])] * 3
+                kf_idxs = np.array([])
+                return frame, kf_idxs
             outliers = idxs_3d[~mask]
             inliers = np.full(len(frame.key_pts), True)
             inliers[outliers] = False
             frame.pose = T
-        frame.key_pts = frame.key_pts[inliers]
-        frame.undist = frame.undist[inliers]
-        kf_idxs = kf_idxs[inliers]
+            frame.key_pts = frame.key_pts[inliers]
+            frame.undist = frame.undist[inliers]
+            kf_idxs = kf_idxs[inliers]
+        else:
+            print("Not enough landmarks for PnP")
         frame.observations = {}
         for i, kf_idx in enumerate(kf_idxs):
             landmark = current_keyframe.observations[kf_idx]
@@ -101,33 +100,59 @@ def create_frontend(
 
     def keyframe_recognition(frame, kf_idxs):
         _, current_keyframe = current_context()
-        avg_parallax = average_parallax(
-            frame.pose,
-            current_keyframe.pose,
-            frame.undist,
-            current_keyframe.undist[kf_idxs],
+        avg_parallax = (
+            average_parallax(
+                frame.pose,
+                current_keyframe.pose,
+                frame.undist,
+                current_keyframe.undist[kf_idxs],
+            )
+            if len(frame.undist) > 0
+            else 0
         )
         current_landmarks = [
-            *(lm for lm in frame.observations.values() if lm.is_initialized),
+            lm for lm in frame.observations.values() if lm.is_initialized
         ]
         kf_landmarks = [
-            *(lm for lm in current_keyframe.observations.values() if lm.is_initialized),
+            lm for lm in current_keyframe.observations.values() if lm.is_initialized
         ]
+        tracked_lm_ratio = (
+            len(current_landmarks) / len(kf_landmarks) if len(kf_landmarks) else 0
+        )
         num_tracked = len(frame.key_pts)
+        (
+            kf_parallax_threshold,
+            max_features,
+            min_features,
+            kf_landmark_ratio,
+        ) = itemgetter(
+            "kf_parallax_threshold",
+            "max_features",
+            "min_features",
+            "kf_landmark_ratio",
+        )(
+            frontend_params
+        )
         if (
-            avg_parallax > frontend_params["kf_avg_parallax"]
+            avg_parallax > kf_parallax_threshold
             or current_keyframe.id > 0
-            and avg_parallax > frontend_params["kf_avg_parallax"] / 2.0
-            and num_tracked < frontend_params["n_features"] / 2.0
-            and len(current_landmarks) / len(kf_landmarks)
-            < frontend_params["kf_point_ratio"]
+            and (
+                num_tracked < min_features
+                or avg_parallax > kf_parallax_threshold / 2.0
+                and (
+                    num_tracked < max_features / 2.0
+                    and tracked_lm_ratio < kf_landmark_ratio + 0.1
+                    or tracked_lm_ratio < kf_landmark_ratio
+                )
+            )
         ):
             n_ret, frame = detector(
                 frame,
-                frontend_params["n_features"] - num_tracked,
+                max_features - num_tracked,
             )
             if n_ret == 0:
-                return None
+                context["last_frame"] = frame
+                return frame
             frame.is_keyframe = True
             context["current_keyframe"] = frame
         context["last_frame"] = frame
@@ -135,20 +160,18 @@ def create_frontend(
 
     def frontend(frame):
         if frame.id == 0:
-            n_ret, frame = detector(frame, frontend_params["n_features"])
+            n_ret, frame = detector(frame, frontend_params["max_features"])
             if n_ret == 0:
-                return None
+                return frame
             frame.pose = np.eye(4)
             frame.is_keyframe = True
             context["current_keyframe"] = frame
             context["last_frame"] = frame
             return frame
+        last_frame, _ = current_context()
+        frame.pose = last_frame.pose
         frame, kf_idxs = match_features(frame)
-        if frame is None:
-            return None
         frame, kf_idxs = localization(frame, kf_idxs)
-        if frame is None:
-            return None
         return keyframe_recognition(frame, kf_idxs)
 
     return frontend

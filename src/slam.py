@@ -49,13 +49,17 @@ def main():
     video_stream = video.get_video_stream()
 
     K, Kinv, d = get_calibration_params()
-    undistort = lambda kp: undistortPoints(
-        kp,
-        K,
-        d,
-        R=np.eye(3),
-        P=K,
-    ).squeeze()
+    undistort = (
+        lambda kp: undistortPoints(
+            kp,
+            K,
+            d,
+            R=np.eye(3),
+            P=K,
+        ).squeeze()
+        if len(kp)
+        else np.array([])
+    )
 
     detector = create_lk_orb_detector(undistort)
     tracker = track_to_new_frame
@@ -112,18 +116,13 @@ def main():
                     frame.undist[curr_idxs],
                     ref_kf.undist[ref_idxs],
                 )
-                good_candidates = parallax > frontend_params["kf_avg_parallax"] * 0.5
-                if np.count_nonzero(good_candidates) == 0:
-                    continue
-                curr_idxs = curr_idxs[good_candidates]
-                ref_idxs = ref_idxs[good_candidates]
                 pts_3d, good_pts = triangulation(
                     frame.pose,
                     ref_kf.pose,
                     frame.undist[curr_idxs],
                     ref_kf.undist[ref_idxs],
                 )
-                old_kps = parallax[good_candidates] > frontend_params["kf_avg_parallax"]
+                old_kps = parallax > frontend_params["kf_parallax_threshold"]
                 for i in sorted(
                     ref_idxs[old_kps & ~good_pts],
                     reverse=True,
@@ -141,11 +140,14 @@ def main():
                     map_points += [landmark]
 
         await_draw = send_draw_task(tracked_frames)
-        await_map = send_map_task(tracked_frames, map_points)
+        await_map = send_map_task(
+            tracked_frames,
+            [lm for lm in frame.observations.values() if lm.is_initialized],
+        )
         if thread_context.is_closed:
             break
-        await_draw()
-        await_map()
+        # await_draw()
+        # await_map()
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()
