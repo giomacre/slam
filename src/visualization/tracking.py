@@ -26,7 +26,7 @@ def create_drawer_thread(
 
     def draw_task(frames):
         observations = []
-        for pt in frames[-1].observations:
+        for pt in frames[-1].observations.values():
             last_n = reversed(
                 [
                     *islice(

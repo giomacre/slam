@@ -42,7 +42,7 @@ def to_image_coords(K, x):
     return scaled[..., :2, :]
 
 
-def computeParallax(
+def compute_parallax(
     K,
     Kinv,
     current_pose,
@@ -56,9 +56,7 @@ def computeParallax(
         @ current_pose[:3, :3]
         @ to_camera_coords(Kinv, current_points.T),
     ).T
-    return np.mean(
-        np.linalg.norm(
-            back_projection - reference_points,
-            axis=1,
-        )
+    return np.linalg.norm(
+        back_projection - reference_points,
+        axis=1,
     )

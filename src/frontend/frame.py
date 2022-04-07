@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, OrderedDict
 import numpy as np
 
 
@@ -11,7 +11,7 @@ class Frame:
     desc: np.ndarray = np.empty(shape=())
     undist: np.ndarray = np.empty(shape=())
     pose: np.ndarray = np.empty(shape=())
-    observations: List = field(default_factory=lambda: [])
+    observations: OrderedDict = field(default_factory=lambda: OrderedDict([]))
     is_keyframe: bool = False
 
 

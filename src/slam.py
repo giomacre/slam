@@ -6,7 +6,7 @@ import numpy as np
 from threading import current_thread
 from .frontend.camera_calibration import (
     get_calibration_params,
-    computeParallax,
+    compute_parallax,
 )
 from .utils.params import frontend_params
 from .frontend.method import create_frontend
@@ -60,12 +60,13 @@ def main():
     detector = create_lk_orb_detector(undistort)
     tracker = track_to_new_frame
     epipolar_localizer = partial(epipolar_ransac, K)
+    get_parallax = partial(compute_parallax, K, Kinv)
     frontend = create_frontend(
         detector,
         tracker,
         epipolar_localizer,
         undistort,
-        partial(computeParallax, K, Kinv),
+        lambda *a: np.mean(get_parallax(*a)),
         partial(pnp_ransac, K),
     )
 
@@ -92,7 +93,7 @@ def main():
         if frame.is_keyframe:
             candidate_pts = [
                 (id, lm)
-                for id, lm in enumerate(frame.observations)
+                for id, lm in frame.observations.items()
                 if not lm.is_initialized and len(lm.idxs) > 1
             ]
             matches = DefaultDict(lambda: [[], []])
@@ -101,15 +102,34 @@ def main():
                 ref_idxs, curr_idxs = matches[id]
                 ref_idxs += [idx]
                 curr_idxs += [curr_idx]
-            for f_id, (ref_idxs, curr_idxs) in matches.items():
+            for kf_id, (ref_idxs, curr_idxs) in matches.items():
+                ref_kf = tracked_frames[kf_id]
                 ref_idxs = np.array(ref_idxs)
                 curr_idxs = np.array(curr_idxs)
+                parallax = get_parallax(
+                    frame.pose,
+                    ref_kf.pose,
+                    frame.undist[curr_idxs],
+                    ref_kf.undist[ref_idxs],
+                )
+                good_candidates = parallax > frontend_params["kf_avg_parallax"] * 0.5
+                if np.count_nonzero(good_candidates) == 0:
+                    continue
+                curr_idxs = curr_idxs[good_candidates]
+                ref_idxs = ref_idxs[good_candidates]
                 pts_3d, good_pts = triangulation(
                     frame.pose,
-                    tracked_frames[f_id].pose,
+                    ref_kf.pose,
                     frame.undist[curr_idxs],
-                    tracked_frames[f_id].undist[ref_idxs],
+                    ref_kf.undist[ref_idxs],
                 )
+                old_kps = parallax[good_candidates] > frontend_params["kf_avg_parallax"]
+                for i in sorted(
+                    ref_idxs[old_kps & ~good_pts],
+                    reverse=True,
+                ):
+                    del ref_kf.observations[i].idxs[kf_id]
+                    del ref_kf.observations[i]
                 map_points = []
                 for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):
                     to_idx = lambda kp: tuple(np.rint(kp).astype(int)[::-1])
@@ -124,8 +144,8 @@ def main():
         await_map = send_map_task(tracked_frames, map_points)
         if thread_context.is_closed:
             break
-        # await_draw()
-        # await_map()
+        await_draw()
+        await_map()
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()

@@ -28,7 +28,7 @@ def create_frontend(
             last_frame,
         )
         if len(tracked) == 0:
-            return [None] * 3
+            return [None] * 2
         # Filter outliers with RANSAC
         frame.key_pts = tracked
         frame.undist = undistort(frame.key_pts)
@@ -37,7 +37,7 @@ def create_frontend(
             last_frame.undist[train_idxs],
         )
         if inliers is None:
-            return [None] * 3
+            return [None] * 2
         train_idxs = train_idxs[inliers]
         frame.key_pts = frame.key_pts[inliers]
         frame.undist = frame.undist[inliers]
@@ -49,34 +49,39 @@ def create_frontend(
                 )
             ]
         )
-        observations = [current_keyframe.observations[i] for i in kf_idxs]
-        return frame, kf_idxs, observations
+        return frame, kf_idxs
 
-    def localization(frame, kf_idxs, observations):
+    def localization(frame, kf_idxs):
+        # print(f"LOCALIZATION {frame.id=}")
         _, current_keyframe = current_context()
         pts_3d, idxs_3d = [[]] * 2
         values = tuple(
             np.array(a)
             for a in zip(
                 *(
-                    (lm.coords, idx)
-                    for idx, lm in enumerate(observations)
-                    if lm.is_initialized
+                    (current_keyframe.observations[kf_idx].coords, idx)
+                    for idx, kf_idx in enumerate(kf_idxs)
+                    if current_keyframe.observations[kf_idx].is_initialized
                 )
             )
         )
         if len(values) > 0:
             pts_3d, idxs_3d = values
         if len(pts_3d) < 4:
+            print("ESS.MAT.")
+            print(f"{len(kf_idxs)=}\n{len(pts_3d)=}")
             T, inliers = epipolar_ransac(
                 frame.undist,
                 current_keyframe.undist[kf_idxs],
             )
+            # print(f"{T=}\n{np.count_nonzero(inliers)=}\n{current_keyframe.pose=}")
             if T is None:
                 return [None] * 2
             frame.pose = T @ current_keyframe.pose
         else:
+            # print("PnP RANSAC")
             T, mask = pnp_ransac(pts_3d, frame.undist[idxs_3d])
+            # print(f"{T=}\n{np.count_nonzero(mask)=}\n{current_keyframe.pose=}")
             if T is None:
                 return [None] * 2
             outliers = idxs_3d[~mask]
@@ -86,7 +91,7 @@ def create_frontend(
         frame.key_pts = frame.key_pts[inliers]
         frame.undist = frame.undist[inliers]
         kf_idxs = kf_idxs[inliers]
-        frame.observations = [None] * len(kf_idxs)
+        frame.observations = {}
         for i, kf_idx in enumerate(kf_idxs):
             landmark = current_keyframe.observations[kf_idx]
             landmark.idxs |= {frame.id: i}
@@ -103,10 +108,10 @@ def create_frontend(
             current_keyframe.undist[kf_idxs],
         )
         current_landmarks = [
-            *(lm for lm in frame.observations if lm.is_initialized),
+            *(lm for lm in frame.observations.values() if lm.is_initialized),
         ]
         kf_landmarks = [
-            *(lm for lm in current_keyframe.observations if lm.is_initialized),
+            *(lm for lm in current_keyframe.observations.values() if lm.is_initialized),
         ]
         num_tracked = len(frame.key_pts)
         if (
@@ -138,10 +143,10 @@ def create_frontend(
             context["current_keyframe"] = frame
             context["last_frame"] = frame
             return frame
-        frame, kf_idxs, observations = match_features(frame)
+        frame, kf_idxs = match_features(frame)
         if frame is None:
             return None
-        frame, kf_idxs = localization(frame, kf_idxs, observations)
+        frame, kf_idxs = localization(frame, kf_idxs)
         if frame is None:
             return None
         return keyframe_recognition(frame, kf_idxs)
