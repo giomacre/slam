@@ -49,11 +49,14 @@ def create_orb_detector(undistort, **orb_args):
             n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
             undist = undistort(key_pts)
+            start = (
+                max(frame.observations.keys()) + 1 if len(frame.observations) > 0 else 0
+            )
             observations = {
                 i: create_point(frame, i)
                 for i in range(
-                    len(frame.observations),
-                    len(frame.observations) + len(key_pts),
+                    start,
+                    start + len(key_pts),
                 )
             }
             if len(frame.key_pts > 0):
