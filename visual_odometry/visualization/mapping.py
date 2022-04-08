@@ -5,7 +5,7 @@ import os
 import sys
 import numpy as np
 
-from src.utils.slam_logging import performance_timer
+from ..utils.slam_logging import performance_timer
 from ..utils.worker import create_worker
 from ..utils.decorators import stateful_decorator
 

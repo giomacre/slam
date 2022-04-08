@@ -28,24 +28,8 @@ from .visualization.tracking import create_drawer_thread
 np.set_printoptions(precision=3, suppress=True)
 
 
-def main():
-    from argparse import ArgumentParser, ArgumentTypeError
-
-    def check_file(path):
-        from cv2 import VideoCapture
-
-        video = VideoCapture(path)
-        if video.isOpened():
-            return path
-        raise ArgumentTypeError(f"{path} is not a valid file.")
-
-    parser = ArgumentParser()
-    parser.add_argument(
-        "video_path",
-        type=check_file,
-    )
-    args = parser.parse_args()
-    video = Video(args.video_path)
+def start(video_path):
+    video = Video(video_path)
     video_stream = video.get_video_stream()
 
     K, Kinv, d = get_calibration_params()
@@ -152,9 +136,3 @@ def main():
     thread_context.cleanup()
     thread_context.join_all()
     print(f"{current_thread()} exiting.")
-
-
-if __name__ == "__main__":
-    from sys import argv
-
-    main(argv)

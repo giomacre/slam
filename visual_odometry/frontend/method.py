@@ -52,7 +52,6 @@ def create_frontend(
         return frame, kf_idxs
 
     def localization(frame, kf_idxs):
-        # print(f"LOCALIZATION {frame.id=}")
         _, current_keyframe = current_context()
         pts_3d, idxs_3d = [[]] * 2
         values = tuple(
@@ -68,9 +67,7 @@ def create_frontend(
         if len(values) > 0:
             pts_3d, idxs_3d = values
         if len(pts_3d) >= 4:
-            # print("PnP RANSAC")
             T, mask = pnp_ransac(pts_3d, frame.undist[idxs_3d])
-            # print(f"{T=}\n{np.count_nonzero(mask)=}\n{current_keyframe.pose=}")
             frame.key_pts, frame.undist, frame.desc
             if T is None:
                 print("PnP tracking failed")
@@ -135,16 +132,10 @@ def create_frontend(
         )
         if (
             avg_parallax > kf_parallax_threshold
+            or num_tracked < min_features
             or current_keyframe.id > 0
-            and (
-                num_tracked < min_features
-                or avg_parallax > kf_parallax_threshold / 2.0
-                and (
-                    num_tracked < max_features / 2.0
-                    and tracked_lm_ratio < kf_landmark_ratio + 0.1
-                    or tracked_lm_ratio < kf_landmark_ratio
-                )
-            )
+            and avg_parallax > kf_parallax_threshold / 2.0
+            and tracked_lm_ratio < kf_landmark_ratio
         ):
             n_ret, frame = detector(
                 frame,
@@ -160,7 +151,10 @@ def create_frontend(
 
     def frontend(frame):
         if frame.id == 0:
-            n_ret, frame = detector(frame, frontend_params["max_features"])
+            n_ret, frame = detector(
+                frame,
+                frontend_params["max_features"],
+            )
             if n_ret == 0:
                 return frame
             frame.pose = np.eye(4)
