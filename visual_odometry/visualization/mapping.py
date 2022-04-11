@@ -8,6 +8,7 @@ import numpy as np
 from ..utils.slam_logging import performance_timer
 from ..utils.worker import create_worker
 from ..utils.decorators import stateful_decorator
+from ..utils.params import frontend_params
 
 sys.path.append(
     os.path.join(
@@ -81,6 +82,7 @@ def draw_map(
         poses += [pose]
         positions += [pose[:3, 3:]]
         if len(new_points) > 0:
+            render_state.Follow(pango.OpenGlMatrix(pose), True)
             new_coords, new_colors = zip(*new_points)
             map_points["coords"] = new_coords
             map_points["colors"] = new_colors
@@ -105,7 +107,7 @@ def draw_map(
         Kinv,
         *video_size,
         poses[-1],
-        0.25,
+        0.1,
     )
     if len(map_points["coords"]) > 0:
         gl.glPointSize(2)
@@ -117,11 +119,11 @@ def setup_pangolin(
     width,
     height,
     context,
-    focal_length=500,
+    focal_length=2000,
     z_near=0.1,
-    z_far=1000,
-    camera_pos=[2.5, -10.0, -15.0],
-    target=[0.0, 0.5, 0.5],
+    z_far=10000,
+    camera_pos=[2.5, -.5, -5],
+    target=[0.0, 0.0, 1.5],
     up_direction=[0.0, -1.0, 0.0],
 ):
     pango.CreateWindowAndBind("", width, height)

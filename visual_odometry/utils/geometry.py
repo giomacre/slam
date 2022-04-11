@@ -3,7 +3,7 @@ import numpy as np
 import cv2 as cv
 from ..frontend.camera_calibration import to_image_coords
 from .slam_logging import log_pose_estimation, log_triangulation, performance_timer
-from .params import frontend_params
+from .params import frontend_params, ransac_params
 
 
 # @log_pose_estimation
@@ -14,8 +14,8 @@ def epipolar_ransac(K, query_pts, train_pts):
         train_pts,
         query_pts,
         K,
-        prob=0.999,
-        threshold=3.0,
+        prob=ransac_params["em_confidence"],
+        threshold=ransac_params["em_threshold"],
     )
     n_inliers = np.count_nonzero(mask)
     # if n_inliers < 6 or n_inliers < len(train_pts) / 2:
@@ -46,9 +46,9 @@ def pnp_ransac(K, lm_coords, image_coords):
         image_coords,
         K,
         distCoeffs=None,
-        reprojectionError=3.0,
-        confidence=0.999,
-        iterationsCount=1000,
+        reprojectionError=ransac_params["p3p_threshold"],
+        confidence=ransac_params["p3p_confidence"],
+        iterationsCount=ransac_params["p3p_iterations"],
         flags=cv.SOLVEPNP_P3P,
     )
     if not retval or len(inliers) < 5:
@@ -60,9 +60,9 @@ def pnp_ransac(K, lm_coords, image_coords):
         None,
         rotvec,
         tvec,
-        reprojectionError=3.0,
-        confidence=0.999,
-        iterationsCount=1000,
+        reprojectionError=ransac_params["p3p_threshold"],
+        confidence=ransac_params["p3p_confidence"],
+        iterationsCount=ransac_params["p3p_iterations"],
         useExtrinsicGuess=True,
         flags=cv.SOLVEPNP_ITERATIVE,
     )
@@ -108,7 +108,7 @@ def create_point_triangulator(K):
         low_err = reduce(
             np.bitwise_and,
             (
-                np.linalg.norm(a - b.T, axis=0) < 3.0
+                np.linalg.norm(a - b.T, axis=0) < ransac_params["p3p_threshold"]
                 for a, b in zip(
                     projected,
                     [current_points, reference_points],
