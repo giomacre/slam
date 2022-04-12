@@ -1,5 +1,5 @@
 from functools import partial
-from itertools import islice
+from itertools import chain, islice
 from operator import itemgetter
 import os
 import sys
@@ -53,7 +53,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
     # @performance_timer()
     def prepare_task(frames, new_points):
         pose = frames[-1].pose
-        map_points = [(p.coords, p.color) for p in new_points]
+        map_points = [(p.coords, p.color) for p in new_points[::10]]
         return worker(
             pose,
             map_points,
@@ -83,8 +83,8 @@ def draw_map(
             if visualization_params["follow_camera"]:
                 render_state.Follow(pango.OpenGlMatrix(pose), True)
             new_coords, new_colors = zip(*new_points)
-            map_points["coords"] = new_coords
-            map_points["colors"] = new_colors
+            map_points["coords"].extend(new_coords)
+            map_points["colors"].extend(new_colors)
 
     if len(poses) == 0:
         return
@@ -94,14 +94,14 @@ def draw_map(
     gl.glColor(1.0, 0.85, 0.3)
     pango.glDrawLineStrip(positions)
     gl.glLineWidth(2)
-    gl.glColor(0.0, 1.0, 0.0)
-    for pose in poses[:-1]:
-        pango.glDrawFrustum(
-            Kinv,
-            *video_size,
-            pose,
-            0.1 * frontend_params["epipolar_scale"],
-        )
+    # gl.glColor(0.0, 1.0, 0.0)
+    # for pose in poses[:-1]:
+    #     pango.glDrawFrustum(
+    #         Kinv,
+    #         *video_size,
+    #         pose,
+    #         0.1 * frontend_params["epipolar_scale"],
+    #     )
     gl.glColor(0.4, 0.0, 1.0)
     pango.glDrawFrustum(
         Kinv,
@@ -111,7 +111,10 @@ def draw_map(
     )
     if len(map_points["coords"]) > 0:
         gl.glPointSize(2)
-        pango.DrawPoints(map_points["coords"], map_points["colors"])
+        pango.DrawPoints(
+            map_points["coords"],
+            map_points["colors"],
+        )
     pango.FinishFrame()
 
 
