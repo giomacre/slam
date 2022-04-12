@@ -4,6 +4,8 @@ from typing import DefaultDict
 from cv2 import undistortPoints
 import numpy as np
 from threading import current_thread
+
+from .utils.slam_logging import performance_timer
 from .frontend.camera_calibration import (
     get_calibration_params,
     compute_parallax,
@@ -68,15 +70,11 @@ def start(video_path):
         thread_context,
     )
 
-    thread_context.start()
-    frames = video_stream
-    tracked_frames = []
-    map_points = []
-    for image in frames:
+    def process_frame(tracked_frames, map_points, image):
         frame = create_frame(len(tracked_frames), image)
         frame = frontend(frame)
         if frame is None:
-            continue
+            return lambda: None
         tracked_frames += [frame]
         if frame.is_keyframe:
             candidate_pts = [
@@ -107,10 +105,7 @@ def start(video_path):
                     ref_kf.undist[ref_idxs],
                 )
                 old_kps = parallax > frontend_params["kf_parallax_threshold"]
-                for i in sorted(
-                    ref_idxs[old_kps & ~good_pts],
-                    reverse=True,
-                ):
+                for i in ref_idxs[old_kps & ~good_pts]:
                     del ref_kf.observations[i].idxs[kf_id]
                     del ref_kf.observations[i]
                 map_points = []
@@ -122,16 +117,26 @@ def start(video_path):
                     landmark.color = frame.image[img_idx] / 255.0
                     landmark.is_initialized = True
                     map_points += [landmark]
+        if thread_context.is_closed:
+            return lambda: None
 
         await_draw = send_draw_task(tracked_frames)
         await_map = send_map_task(
             tracked_frames,
             [lm for lm in frame.observations.values() if lm.is_initialized],
         )
+        return lambda: [f() for f in [await_draw, await_map]]
+
+    tracked_frames = []
+    map_points = []
+    thread_context.start()
+    frames = video_stream
+    process_frame = partial(process_frame, tracked_frames, map_points)
+    for image in frames:
+        wait_visualization = process_frame(image)
         if thread_context.is_closed:
             break
-        # await_draw()
-        # await_map()
+        # wait_visualization()
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()

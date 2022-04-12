@@ -69,7 +69,7 @@ def create_worker(
     )
 
     def register_task(*args):
-        queue.put(args)
+        queue.put(args, block=False)
         return queue.join
 
     def worker_loop(queue):
@@ -78,8 +78,6 @@ def create_worker(
             partial(queue.get, timeout=timeout),
             None,
         ):
-            if thread_context.is_closed:
-                break
             target(*args)
             queue.task_done()
         while not queue.empty():

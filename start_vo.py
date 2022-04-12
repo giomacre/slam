@@ -47,7 +47,15 @@ if __name__ == "__main__":
                 "p3p_confidence",
                 "p3p_iterations",
             ]
-            properties = [*camera_properties, *frontend_properties, *ransac_properties]
+            visualization_properties = [
+                "follow_camera",
+            ]
+            properties = [
+                *camera_properties,
+                *frontend_properties,
+                *ransac_properties,
+                *visualization_properties,
+            ]
             values = itemgetter(*properties)(params)
             unspecified = [*map(lambda x: x is None, values)]
             if any(unspecified):
@@ -62,7 +70,13 @@ if __name__ == "__main__":
             camera_params = {k: params[k] for k in camera_properties}
             frontend_params = {k: params[k] for k in frontend_properties}
             ransac_params = {k: params[k] for k in ransac_properties}
-            import_parameters(camera_params, frontend_params, ransac_params)
+            visualization_params = {k: params[k] for k in visualization_properties}
+            import_parameters(
+                camera_params,
+                frontend_params,
+                ransac_params,
+                visualization_params,
+            )
         except IOError:
             raise ArgumentTypeError(f"{path} is not a valid path")
         except ValueError:

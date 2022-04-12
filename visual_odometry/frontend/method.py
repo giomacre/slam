@@ -1,5 +1,7 @@
 from functools import partial
 from operator import itemgetter
+
+from ..utils.slam_logging import performance_timer
 from ..utils.params import frontend_params
 import numpy as np
 
@@ -140,11 +142,7 @@ def create_frontend(
             and (
                 len(current_landmarks) < min_features // 2
                 or avg_parallax > kf_parallax_threshold / 2.0
-                and (
-                    tracked_lm_ratio < kf_landmark_ratio
-                    # or tracked_lm_ratio < kf_landmark_ratio + 0.1
-                    # and num_tracked < max_features * 0.5
-                )
+                and tracked_lm_ratio < kf_landmark_ratio
             )
         ):
             n_ret, frame = detector(

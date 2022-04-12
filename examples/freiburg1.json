@@ -8,14 +8,15 @@
     "p1": -0.0054,
     "p2": 0.0026,
     "k3": 1.1633,
-    "max_features": 200,
-    "min_features": 50,
-    "kf_landmark_ratio": 0.75,
-    "kf_parallax_threshold": 20.0,
-    "epipolar_scale": 0.25,
+    "max_features": 350,
+    "min_features": 120,
+    "kf_landmark_ratio": 0.85,
+    "kf_parallax_threshold": 25.0,
+    "epipolar_scale": 0.05,
     "em_threshold": 3.0,
     "em_confidence": 0.999,
     "p3p_threshold": 3.0,
     "p3p_confidence": 0.999,
-    "p3p_iterations": 1000
+    "p3p_iterations": 1000,
+    "follow_camera": false
 }

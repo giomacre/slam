@@ -18,23 +18,21 @@ def epipolar_ransac(K, query_pts, train_pts):
         threshold=ransac_params["em_threshold"],
     )
     n_inliers = np.count_nonzero(mask)
-    # if n_inliers < 6 or n_inliers < len(train_pts) / 2:
-    if n_inliers < 6:
+    if n_inliers < 5:
         return [None] * 2
-    train_refined, query_refined = cv.correctMatches(
+
+    train_pts, query_pts = cv.correctMatches(
         E,
-        train_pts[None, ...],
-        query_pts[None, ...],
+        train_pts[None, ...].copy(),
+        query_pts[None, ...].copy(),
     )
-    _, R, t, mask_pose = cv.recoverPose(
+    _, R, t, _ = cv.recoverPose(
         E,
-        train_refined,
-        query_refined,
+        train_pts,
+        query_pts,
         K,
         mask=mask.copy(),
     )
-    # if np.count_nonzero(mask_pose) < 6:
-    #     return [None] * 2
     T = construct_pose(R.T, -R.T @ t * frontend_params["epipolar_scale"])
     mask = mask.astype(np.bool).ravel()
     return T, mask
@@ -48,12 +46,11 @@ def pnp_ransac(K, lm_coords, image_coords):
         distCoeffs=None,
         reprojectionError=ransac_params["p3p_threshold"],
         confidence=ransac_params["p3p_confidence"],
-        iterationsCount=ransac_params["p3p_iterations"],
         flags=cv.SOLVEPNP_P3P,
     )
-    if not retval or len(inliers) < 5:
+    if not retval or len(inliers) < 4:
         return [None] * 2
-    _, rotvec, tvec, _ = cv.solvePnPRansac(
+    _, rotvec, tvec, inliers_ref = cv.solvePnPRansac(
         lm_coords[inliers],
         image_coords[inliers],
         K,
@@ -66,9 +63,12 @@ def pnp_ransac(K, lm_coords, image_coords):
         useExtrinsicGuess=True,
         flags=cv.SOLVEPNP_ITERATIVE,
     )
+    if not retval or len(inliers_ref) < 4:
+        return [None] * 2
     R = cv.Rodrigues(rotvec)[0].T
     T = construct_pose(R, -R @ tvec)
     mask = np.full(len(lm_coords), False)
+    inliers = inliers[inliers_ref.flatten()]
     mask[inliers.flatten()] = True
     return T, mask
 
