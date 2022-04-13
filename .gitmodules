@@ -1,0 +1,18 @@
+[submodule "external/ANMS-Codes"]
+	path = external/ANMS-Codes
+	url = https://github.com/BAILOOL/ANMS-Codes
+[submodule "external/Pangolin"]
+	path = external/Pangolin
+	url = git@github.com:giomacre/Pangolin.git
+[submodule "external/ceres_python_bindings"]
+	path = external/ceres_python_bindings
+	url = https://github.com/Edwinem/ceres_python_bindings.git
+[submodule "external/ceres-solver"]
+	path = external/ceres-solver
+	url = https://github.com/ceres-solver/ceres-solver
+[submodule "external/geometry"]
+	path = external/geometry
+	url = https://github.com/goromal/geometry
+[submodule "external/manif-geom-cpp"]
+	path = external/manif-geom-cpp
+	url = https://github.com/goromal/manif-geom-cpp

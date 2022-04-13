@@ -1,12 +1,10 @@
 from functools import partial
 from itertools import chain, islice
 from operator import itemgetter
-import os
-import sys
-import numpy as np
-
 from ..utils.worker import create_worker
 from ..utils.params import frontend_params, visualization_params
+import sys
+import os
 
 sys.path.append(
     os.path.join(

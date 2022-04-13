@@ -4,6 +4,15 @@ from operator import itemgetter
 from typing import DefaultDict
 from visual_odometry import start
 from visual_odometry.utils.params import import_parameters
+import sys
+import os
+
+sys.path.append(
+    os.path.join(
+        os.path.dirname(sys.argv[0]),
+        "lib",
+    )
+)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser, ArgumentTypeError
