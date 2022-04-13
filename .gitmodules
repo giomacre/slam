@@ -3,7 +3,7 @@
 	url = https://github.com/BAILOOL/ANMS-Codes
 [submodule "external/Pangolin"]
 	path = external/Pangolin
-	url = git@github.com:giomacre/Pangolin.git
+	url = https://github.com/giomacre/Pangolin.git
 [submodule "external/ceres_python_bindings"]
 	path = external/ceres_python_bindings
 	url = https://github.com/Edwinem/ceres_python_bindings.git
@@ -16,3 +16,9 @@
 [submodule "external/manif-geom-cpp"]
 	path = external/manif-geom-cpp
 	url = https://github.com/goromal/manif-geom-cpp
+[submodule "external/ceres-factors"]
+	path = external/ceres-factors
+	url = https://github.com/giomacre/ceres-factors.git
+[submodule "external/pyceres_factors"]
+	path = external/pyceres_factors
+	url = https://github.com/giomacre/pyceres_factors.git

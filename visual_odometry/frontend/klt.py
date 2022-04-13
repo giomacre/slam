@@ -33,7 +33,7 @@ def create_lk_orb_detector(undistort, **orb_args):
     return detector
 
 
-# @log_feature_match
+@log_feature_match
 def track_to_new_frame(query_frame, train_frame):
     train_pts = train_frame.key_pts.reshape(-1, 1, 2).copy()
     query_gray, train_gray = (
@@ -73,7 +73,13 @@ def track_to_new_frame(query_frame, train_frame):
         ),
     )
     status_reverse = status_reverse.ravel().astype(np.bool)
-    good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 0.5
+    good_matches = (
+        np.linalg.norm(
+            tracked_reverse - train_pts,
+            axis=2,
+        )
+        < 0.5
+    )
     good_matches = good_matches.ravel()
     good_idxs = np.flatnonzero(
         reduce(

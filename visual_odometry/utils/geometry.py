@@ -39,30 +39,48 @@ def epipolar_ransac(K, query_pts, train_pts):
 
 
 def pnp_ransac(K, lm_coords, image_coords):
-    retval, rotvec, tvec, inliers = cv.solvePnPRansac(
-        lm_coords,
-        image_coords,
-        K,
-        distCoeffs=None,
-        reprojectionError=ransac_params["p3p_threshold"],
-        confidence=ransac_params["p3p_confidence"],
-        flags=cv.SOLVEPNP_P3P,
-    )
+    def dump(rotvec, tvec, inliers, name):
+        R = cv.Rodrigues(rotvec)[0].T
+        T = construct_pose(R, -R @ tvec)
+        with open(f"T{name}.npb", "wb") as file:
+            np.save(file, T)
+        with open(f"3dc{name}.npb", "wb") as file:
+            np.save(file, lm_coords[inliers])
+        with open(f"2dc{name}.npb", "wb") as file:
+            np.save(file, image_coords[inliers])
+
+    @performance_timer()
+    def initial_estimate():
+        return cv.solvePnPRansac(
+            lm_coords,
+            image_coords,
+            K,
+            distCoeffs=None,
+            reprojectionError=ransac_params["p3p_threshold"],
+            confidence=ransac_params["p3p_confidence"],
+            flags=cv.SOLVEPNP_P3P,
+        )
+
+    @performance_timer()
+    def iterative_refinement():
+        return cv.solvePnPRansac(
+            lm_coords[inliers],
+            image_coords[inliers],
+            K,
+            None,
+            rotvec,
+            tvec,
+            reprojectionError=ransac_params["p3p_threshold"],
+            confidence=ransac_params["p3p_confidence"],
+            iterationsCount=ransac_params["p3p_iterations"],
+            useExtrinsicGuess=True,
+            flags=cv.SOLVEPNP_ITERATIVE,
+        )
+
+    retval, rotvec, tvec, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
         return [None] * 2
-    _, rotvec, tvec, inliers_ref = cv.solvePnPRansac(
-        lm_coords[inliers],
-        image_coords[inliers],
-        K,
-        None,
-        rotvec,
-        tvec,
-        reprojectionError=ransac_params["p3p_threshold"],
-        confidence=ransac_params["p3p_confidence"],
-        iterationsCount=ransac_params["p3p_iterations"],
-        useExtrinsicGuess=True,
-        flags=cv.SOLVEPNP_ITERATIVE,
-    )
+    _, rotvec, tvec, inliers_ref = iterative_refinement()
     if not retval or len(inliers_ref) < 4:
         return [None] * 2
     R = cv.Rodrigues(rotvec)[0].T
