@@ -1,9 +1,10 @@
 from collections import deque
 from functools import partial
-from typing import DefaultDict
 from cv2 import undistortPoints
 import numpy as np
 from threading import current_thread
+
+from .mapping.landmarks import initialize_tracked_landmarks
 
 from .utils.slam_logging import performance_timer
 from .frontend.camera_calibration import (
@@ -27,6 +28,8 @@ from .utils.worker import create_thread_context
 from .visualization.mapping import create_map_thread
 from .visualization.tracking import create_drawer_thread
 
+from .mapping.landmarks import initialize_tracked_landmarks
+
 np.set_printoptions(precision=3, suppress=True)
 
 
@@ -47,20 +50,15 @@ def start(video_path):
         else np.array([])
     )
 
-    detector = create_lk_orb_detector(undistort)
-    tracker = track_to_new_frame
-    epipolar_localizer = partial(epipolar_ransac, K)
     get_parallax = partial(compute_parallax, K, Kinv)
     frontend = create_frontend(
-        detector,
-        tracker,
-        epipolar_localizer,
+        create_lk_orb_detector(undistort),
+        track_to_new_frame,
+        partial(epipolar_ransac, K),
         undistort,
         lambda *a: np.mean(get_parallax(*a)),
         partial(pnp_ransac, K),
     )
-
-    triangulation = create_point_triangulator(K)
 
     thread_context = create_thread_context()
     send_draw_task = create_drawer_thread(thread_context)
@@ -70,73 +68,37 @@ def start(video_path):
         thread_context,
     )
 
-    def process_frame(tracked_frames, map_points, image):
+    def process_frame(triangulate_new_points, tracked_frames, image):
         frame = create_frame(len(tracked_frames), image)
         frame = frontend(frame)
-        if frame is None:
-            return lambda: None
         tracked_frames += [frame]
+        new_points = []
         if frame.is_keyframe:
-            candidate_pts = [
-                (id, lm)
-                for id, lm in frame.observations.items()
-                if not lm.is_initialized and len(lm.idxs) > 1
-            ]
-            matches = DefaultDict(lambda: [[], []])
-            for curr_idx, lm in candidate_pts:
-                id, idx = next(x for x in lm.idxs.items())
-                ref_idxs, curr_idxs = matches[id]
-                ref_idxs += [idx]
-                curr_idxs += [curr_idx]
-            for kf_id, (ref_idxs, curr_idxs) in matches.items():
-                ref_kf = tracked_frames[kf_id]
-                ref_idxs = np.array(ref_idxs)
-                curr_idxs = np.array(curr_idxs)
-                parallax = get_parallax(
-                    frame.pose,
-                    ref_kf.pose,
-                    frame.undist[curr_idxs],
-                    ref_kf.undist[ref_idxs],
-                )
-                pts_3d, good_pts = triangulation(
-                    frame.pose,
-                    ref_kf.pose,
-                    frame.undist[curr_idxs],
-                    ref_kf.undist[ref_idxs],
-                )
-                old_kps = parallax > frontend_params["kf_parallax_threshold"]
-                for i in ref_idxs[old_kps & ~good_pts]:
-                    del ref_kf.observations[i].idxs[kf_id]
-                    del ref_kf.observations[i]
-                map_points = []
-                for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):
-                    to_idx = lambda kp: tuple(np.rint(kp).astype(int)[::-1])
-                    landmark = frame.observations[i]
-                    landmark.coords = pt
-                    img_idx = to_idx(frame.key_pts[i])
-                    landmark.color = frame.image[img_idx] / 255.0
-                    landmark.is_initialized = True
-                    map_points += [landmark]
-        if thread_context.is_closed:
-            return lambda: None
-
+            new_points = triangulate_new_points(frame)
         await_draw = send_draw_task(tracked_frames)
         await_map = send_map_task(
             tracked_frames,
-            [lm for lm in frame.observations.values() if lm.is_initialized],
+            new_points,
         )
         return lambda: [f() for f in [await_draw, await_map]]
 
     tracked_frames = []
-    map_points = []
+    process_frame = partial(
+        process_frame,
+        partial(
+            initialize_tracked_landmarks,
+            get_parallax,
+            create_point_triangulator(K),
+            tracked_frames,
+        ),
+        tracked_frames,
+    )
     thread_context.start()
-    frames = video_stream
-    process_frame = partial(process_frame, tracked_frames, map_points)
-    for image in frames:
+    for image in video_stream:
         wait_visualization = process_frame(image)
         if thread_context.is_closed:
             break
-        # wait_visualization()
+        wait_visualization
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()

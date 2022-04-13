@@ -43,7 +43,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
         visualization_loop,
         thread_context,
         one_shot=setup_window,
-        timeout=16e-3,
+        timeout=32e-3,
         empty_queue_handler=lambda _: visualization_loop(),
         name="PyPangolinViewer",
     )
@@ -51,7 +51,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
     # @performance_timer()
     def prepare_task(frames, new_points):
         pose = frames[-1].pose
-        map_points = [(p.coords, p.color) for p in new_points[::10]]
+        map_points = [(p.coords, p.color) for p in new_points]
         return worker(
             pose,
             map_points,

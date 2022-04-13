@@ -1,9 +1,8 @@
 import os
 import sys
-from chardet import detect
 import cv2 as cv
 import numpy as np
-from ..mapping.point import create_point
+from ..mapping.landmarks import create_landmark
 from ..utils.slam_logging import log_feature_match, log_feature_extraction
 from ..utils.params import frontend_params
 
@@ -63,7 +62,7 @@ def create_orb_detector(undistort, **orb_args):
                 max(frame.observations.keys()) + 1 if len(frame.observations) > 0 else 0
             )
             observations = {
-                i: create_point(frame, i)
+                i: create_landmark(frame, i)
                 for i in range(
                     start,
                     start + len(key_pts),
