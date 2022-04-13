@@ -1,9 +1,0 @@
-[submodule "external/ceres-solver"]
-	path = external/ceres-solver
-	url = https://github.com/giomacre/ceres-solver
-[submodule "external/Pangolin"]
-	path = external/Pangolin
-	url = https://github.com/giomacre/Pangolin
-[submodule "external/ANMS-Codes"]
-	path = external/ANMS-Codes
-	url = https://github.com/BAILOOL/ANMS-Codes
