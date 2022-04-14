@@ -48,6 +48,7 @@ if __name__ == "__main__":
                 "kf_landmark_ratio",
                 "kf_parallax_threshold",
                 "epipolar_scale",
+                "pnp_ceres_chi",
             ]
             ransac_properties = [
                 "em_threshold",
@@ -55,6 +56,7 @@ if __name__ == "__main__":
                 "p3p_threshold",
                 "p3p_confidence",
                 "p3p_iterations",
+                "p3p_ceres_refinement",
             ]
             visualization_properties = [
                 "follow_camera",

@@ -1,10 +1,24 @@
 from functools import reduce
+import sys
+import os
+from click import option
 import numpy as np
 import cv2 as cv
-from ..frontend.camera_calibration import to_image_coords
+
+from ..frontend.camera_calibration import to_homogeneous, to_image_coords
 from .slam_logging import log_pose_estimation, log_triangulation, performance_timer
 from .params import frontend_params, ransac_params
 
+sys.path.append(
+    os.path.join(
+        os.path.dirname(sys.argv[0]),
+        "lib",
+    )
+)
+
+from geometry import SE3
+import PyCeresFactors as factors
+import PyCeres as ceres
 
 # @log_pose_estimation
 def epipolar_ransac(K, query_pts, train_pts):
@@ -38,17 +52,94 @@ def epipolar_ransac(K, query_pts, train_pts):
     return T, mask
 
 
-def pnp_ransac(K, lm_coords, image_coords):
-    def dump(rotvec, tvec, inliers, name):
-        R = cv.Rodrigues(rotvec)[0].T
-        T = construct_pose(R, -R @ tvec)
-        with open(f"T{name}.npb", "wb") as file:
-            np.save(file, T)
-        with open(f"3dc{name}.npb", "wb") as file:
-            np.save(file, lm_coords[inliers])
-        with open(f"2dc{name}.npb", "wb") as file:
-            np.save(file, image_coords[inliers])
+def ceres_pnp_solver(
+    K,
+    T,
+    world_pts,
+    image_pts,
+    use_robust_loss=False,
+):
+    chi_err = frontend_params["pnp_ceres_chi"]
+    T0 = SE3.fromH(T)
+    T_curr = T0.array()
+    Kf = K.astype(np.float32)
+    problem = ceres.Problem()
+    robust_loss = ceres.HuberLoss(np.sqrt(chi_err)) if use_robust_loss else None
+    problem.AddParameterBlock(
+        T_curr,
+        7,
+        factors.SE3Parameterization(),
+    )
+    for i in range(len(world_pts)):
+        factor = factors.SE3ReprojectionFactor(
+            Kf,
+            image_pts[i].T,
+            world_pts[i].T,
+        )
+        problem.AddResidualBlock(factor, robust_loss, T_curr)
 
+    options = ceres.SolverOptions()
+    options.linear_solver_type = ceres.LinearSolverType.DENSE_QR
+    options.trust_region_strategy_type = (
+        ceres.TrustRegionStrategyType.LEVENBERG_MARQUARDT
+    )
+    options.num_threads = 1
+    options.function_tolerance = 1e-3
+    options.minimizer_progress_to_stdout = False
+    summary = ceres.Summary()
+    ceres.Solve(options, problem, summary)
+    T = SE3(T_curr).H()
+    if use_robust_loss:
+        world_h = to_homogeneous(world_pts.squeeze().T)
+        camera_coords = (np.linalg.inv(T) @ world_h)[:3, ...]
+        in_front = camera_coords[2, ...] > 0.0
+        image_pts = image_pts.squeeze().T
+        reproj_err = np.power(
+            np.linalg.norm(
+                image_pts
+                - to_image_coords(
+                    K,
+                    camera_coords,
+                ),
+                axis=0,
+            ),
+            2,
+        )
+        inliers = (reproj_err < chi_err) & in_front
+        if np.count_nonzero(inliers) == 0:
+            return False, None, None
+    else:
+        inliers = np.full(len(world_pts), True)
+    return (
+        summary.IsSolutionUsable() and np.count_nonzero(inliers) >= 4,
+        T,
+        inliers,
+    )
+
+
+@performance_timer()
+def pnp_ceres(K, world_pts, image_pts, T):
+    retval_r, T_r, inliers_r = ceres_pnp_solver(
+        K,
+        T,
+        world_pts,
+        image_pts,
+        use_robust_loss=True,
+    )
+    if not retval_r:
+        return None, None
+    retval_l2, T_l2, _ = ceres_pnp_solver(
+        K,
+        T_r,
+        world_pts[inliers_r],
+        image_pts[inliers_r],
+    )
+    if not retval_l2:
+        return None, None
+    return T_l2, inliers_r
+
+
+def pnp_ransac(K, lm_coords, image_coords, T=None):
     @performance_timer()
     def initial_estimate():
         return cv.solvePnPRansac(
@@ -61,9 +152,8 @@ def pnp_ransac(K, lm_coords, image_coords):
             flags=cv.SOLVEPNP_P3P,
         )
 
-    @performance_timer()
-    def iterative_refinement():
-        return cv.solvePnPRansac(
+    def iterative_refinement(rotvec, tvec, inliers):
+        _, rot, t, _ = cv.solvePnPRansac(
             lm_coords[inliers],
             image_coords[inliers],
             K,
@@ -76,19 +166,29 @@ def pnp_ransac(K, lm_coords, image_coords):
             useExtrinsicGuess=True,
             flags=cv.SOLVEPNP_ITERATIVE,
         )
+        R = cv.Rodrigues(rot)[0]
+        T = construct_pose(R.T, -R.T @ t)
+        return T
 
-    retval, rotvec, tvec, inliers = initial_estimate()
+    def ceres_refinement(rot, t, inliers):
+        R = cv.Rodrigues(rot)[0]
+        T = construct_pose(R.T, -R.T @ t)
+        return pnp_ceres(K, lm_coords[inliers], image_coords[inliers], T)
+
+    retval, rot, t, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
         return [None] * 2
-    _, rotvec, tvec, inliers_ref = iterative_refinement()
-    if not retval or len(inliers_ref) < 4:
+    if ransac_params["p3p_ceres_refinement"]:
+        T_r, inliers_r = ceres_refinement(rot, t, inliers)
+    else:
+        T_r = iterative_refinement(rot, t, inliers)
+    if T_r is None:
         return [None] * 2
-    R = cv.Rodrigues(rotvec)[0].T
-    T = construct_pose(R, -R @ tvec)
     mask = np.full(len(lm_coords), False)
-    inliers = inliers[inliers_ref.flatten()]
-    mask[inliers.flatten()] = True
-    return T, mask
+    inliers = inliers[inliers_r.flatten()]
+    inliers = inliers.flatten()
+    mask[inliers] = True
+    return T_r, mask
 
 
 def create_point_triangulator(K):

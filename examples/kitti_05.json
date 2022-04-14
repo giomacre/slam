@@ -12,11 +12,13 @@
     "min_features": 40,
     "kf_landmark_ratio": 0.75,
     "kf_parallax_threshold": 20.0,
-    "epipolar_scale": 0.05,
+    "epipolar_scale": 0.25,
     "em_threshold": 3.0,
     "em_confidence": 0.999,
     "p3p_threshold": 3.0,
     "p3p_confidence": 0.999,
     "p3p_iterations": 1000,
+    "p3p_ceres_refinement": true,
+    "pnp_ceres_chi": 9.2103,
     "follow_camera": true
 }

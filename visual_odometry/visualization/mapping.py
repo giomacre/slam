@@ -51,7 +51,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
     # @performance_timer()
     def prepare_task(frames, new_points):
         pose = frames[-1].pose
-        map_points = [(p.coords, p.color) for p in new_points]
+        map_points = [(p.coords, p.color) for p in new_points[::5]]
         return worker(
             pose,
             map_points,
@@ -92,14 +92,6 @@ def draw_map(
     gl.glColor(1.0, 0.85, 0.3)
     pango.glDrawLineStrip(positions)
     gl.glLineWidth(2)
-    # gl.glColor(0.0, 1.0, 0.0)
-    # for pose in poses[:-1]:
-    #     pango.glDrawFrustum(
-    #         Kinv,
-    #         *video_size,
-    #         pose,
-    #         0.1 * frontend_params["epipolar_scale"],
-    #     )
     gl.glColor(0.4, 0.0, 1.0)
     pango.glDrawFrustum(
         Kinv,
@@ -121,8 +113,8 @@ def setup_pangolin(
     height,
     context,
     focal_length=2000,
-    z_near=0.1,
-    z_far=1000,
+    z_near=0.001,
+    z_far=10000,
     camera_pos=[0, -1, -15],
     target=[0.0, 0.0, 1.5],
     up_direction=[0.0, -1.0, 0.0],

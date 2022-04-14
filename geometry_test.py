@@ -13,27 +13,22 @@ import PyCeresFactors as factors
 import PyCeres as ceres
 
 # print(SE3)
-print(
-    "\n".join(
-        filter(lambda x: not str.startswith(x, "_"), dir(ceres.TrustRegionStrategyType))
-    )
-)
 print("")
 
 # print(SO3)
 # print("\n".join(filter(lambda x: not str.startswith(x, "_"), dir(SO3))))
 # print("")
 
-with open("K.npb", "rb") as file:
+with open("numpy_dumps/K.npb", "rb") as file:
     K = np.load(file)
 for a in ["epnp", "p3p", "itpnp"]:
-    with open(f"T{a}.npb", "rb") as file:
+    with open(f"numpy_dumps/T{a}.npb", "rb") as file:
         T = np.load(file)
 
-    with open(f"3dc{a}.npb", "rb") as file:
+    with open(f"numpy_dumps/3dc{a}.npb", "rb") as file:
         lm_coords = np.load(file)
 
-    with open(f"2dc{a}.npb", "rb") as file:
+    with open(f"numpy_dumps/2dc{a}.npb", "rb") as file:
         image_coords = np.load(file)
     d = np.random.normal(scale=0.25, size=6)
     d = SE3.Log(SE3.identity())
@@ -62,3 +57,9 @@ for a in ["epnp", "p3p", "itpnp"]:
 
     summary = ceres.Summary()
     ceres.Solve(options, problem, summary)
+
+print(
+    "\n".join(
+        dir(factor),
+    )
+)

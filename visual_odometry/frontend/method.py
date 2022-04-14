@@ -12,7 +12,7 @@ def create_frontend(
     epipolar_ransac,
     undistort,
     average_parallax,
-    pnp_ransac,
+    pnp_pose,
 ):
 
     (
@@ -84,7 +84,7 @@ def create_frontend(
         if len(pts_3d) < 4:
             print("Not enough landmarks for PnP")
             return frame, kf_idxs
-        T, mask = pnp_ransac(pts_3d, frame.undist[idxs_3d])
+        T, mask = pnp_pose(pts_3d, frame.undist[idxs_3d], frame.pose)
         frame.key_pts, frame.undist, frame.desc
         if T is None:
             print("PnP tracking failed")

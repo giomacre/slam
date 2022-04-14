@@ -6,7 +6,6 @@ from threading import current_thread
 
 from .mapping.landmarks import initialize_tracked_landmarks
 
-from .utils.slam_logging import performance_timer
 from .frontend.camera_calibration import (
     get_calibration_params,
     compute_parallax,
@@ -19,9 +18,10 @@ from .frontend.klt import (
     track_to_new_frame,
 )
 from .frontend.video import Video
-from .utils.geometry import (
+from .utils.multiview_geometry import (
     create_point_triangulator,
     epipolar_ransac,
+    pnp_ceres,
     pnp_ransac,
 )
 from .utils.worker import create_thread_context
@@ -96,9 +96,9 @@ def start(video_path):
     thread_context.start()
     for image in video_stream:
         wait_visualization = process_frame(image)
+        # wait_visualization()
         if thread_context.is_closed:
             break
-        wait_visualization
     thread_context.wait_close()
     thread_context.cleanup()
     thread_context.join_all()

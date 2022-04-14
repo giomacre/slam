@@ -69,8 +69,8 @@ def create_worker(
     )
 
     def register_task(*args):
-        queue.put(args, block=False)
-        return queue.join
+        queue.put(args)
+        return lambda: queue.join() if not thread_context.is_closed else None
 
     def worker_loop(queue):
         one_shot()
