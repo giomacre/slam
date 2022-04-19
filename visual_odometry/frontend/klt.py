@@ -20,7 +20,7 @@ def create_lk_orb_detector(undistort, **orb_args):
                 cv.circle(
                     mask_trackings,
                     np.int32(point),
-                    10,
+                    5,
                     0,
                     thickness=cv.FILLED,
                 )

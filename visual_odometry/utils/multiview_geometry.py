@@ -89,54 +89,26 @@ def ceres_pnp_solver(
     summary = ceres.Summary()
     ceres.Solve(options, problem, summary)
     T = SE3(T_curr).H()
-    if use_robust_loss:
-        world_h = to_homogeneous(world_pts.squeeze().T)
-        camera_coords = (np.linalg.inv(T) @ world_h)[:3, ...]
-        in_front = camera_coords[2, ...] > 0.0
-        image_pts = image_pts.squeeze().T
-        reproj_err = np.power(
-            np.linalg.norm(
-                image_pts
-                - to_image_coords(
-                    K,
-                    camera_coords,
-                ),
-                axis=0,
-            ),
-            2,
-        )
-        inliers = (reproj_err < chi_err) & in_front
-        if np.count_nonzero(inliers) == 0:
-            return False, None, None
-    else:
-        inliers = np.full(len(world_pts), True)
+    world_h = to_homogeneous(world_pts.squeeze().T)
+    camera_coords = (np.linalg.inv(T) @ world_h)[:3, ...]
+    in_front = camera_coords[2, ...] > 0.0
+    image_pts = image_pts.squeeze().T
+    reproj_err = np.linalg.norm(
+        image_pts
+        - to_image_coords(
+            K,
+            camera_coords,
+        ),
+        axis=0,
+    )
+    inliers = (reproj_err < (ransac_params["p3p_threshold"])) & in_front
+    if np.count_nonzero(inliers) < 4:
+        return False, None, None
     return (
-        summary.IsSolutionUsable() and np.count_nonzero(inliers) >= 4,
+        summary.IsSolutionUsable(),
         T,
         inliers,
     )
-
-
-@performance_timer()
-def pnp_ceres(K, world_pts, image_pts, T):
-    retval_r, T_r, inliers_r = ceres_pnp_solver(
-        K,
-        T,
-        world_pts,
-        image_pts,
-        use_robust_loss=True,
-    )
-    if not retval_r:
-        return None, None
-    retval_l2, T_l2, _ = ceres_pnp_solver(
-        K,
-        T_r,
-        world_pts[inliers_r],
-        image_pts[inliers_r],
-    )
-    if not retval_l2:
-        return None, None
-    return T_l2, inliers_r
 
 
 def pnp_ransac(K, lm_coords, image_coords, T=None):
@@ -153,7 +125,7 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
         )
 
     def iterative_refinement(rotvec, tvec, inliers):
-        _, rot, t, _ = cv.solvePnPRansac(
+        _, rot, t, inliers_r = cv.solvePnPRansac(
             lm_coords[inliers],
             image_coords[inliers],
             K,
@@ -168,26 +140,51 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
         )
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
-        return T
+        if len(inliers_r) < 4:
+            return [None] * 2
+        return T, inliers_r
 
+    @performance_timer()
     def ceres_refinement(rot, t, inliers):
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
-        return pnp_ceres(K, lm_coords[inliers], image_coords[inliers], T)
+        retval_r, T_r, inliers_r = ceres_pnp_solver(
+            K,
+            T,
+            lm_coords[inliers],
+            image_coords[inliers],
+            use_robust_loss=True,
+        )
+        if not retval_r:
+            return None, None
+        return T_r, inliers_r
+        retval_l2, T_l2, inliers_l2 = ceres_pnp_solver(
+            K,
+            T_r,
+            lm_coords[inliers][inliers_r],
+            image_coords[inliers][inliers_r],
+        )
+        if not retval_l2:
+            return None, None
+        inliers_r[inliers_r] = inliers_l2
+        return T_l2, inliers_r
 
     retval, rot, t, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
         return [None] * 2
     if ransac_params["p3p_ceres_refinement"]:
+        # inliers = np.arange(len(lm_coords))
         T_r, inliers_r = ceres_refinement(rot, t, inliers)
     else:
-        T_r = iterative_refinement(rot, t, inliers)
+        T_r, inliers_r = iterative_refinement(rot, t, inliers)
     if T_r is None:
         return [None] * 2
-    mask = np.full(len(lm_coords), False)
     inliers = inliers[inliers_r.flatten()]
+    mask = np.full(len(lm_coords), False)
     inliers = inliers.flatten()
     mask[inliers] = True
+    if np.count_nonzero(mask) < 0.5 * len(lm_coords):
+        return [None] * 2
     return T_r, mask
 
 
