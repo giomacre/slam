@@ -114,7 +114,7 @@ def setup_pangolin(
     context,
     focal_length=750,
     z_near=0.001,
-    z_far=1000,
+    z_far=10000,
     camera_pos=[0, -1, -15],
     target=[0.0, 0.0, 1.5],
     up_direction=[0.0, -1.0, 0.0],

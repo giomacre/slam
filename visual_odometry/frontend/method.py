@@ -85,7 +85,6 @@ def create_frontend(
             print("Not enough landmarks for PnP")
             return frame, kf_idxs
         T, mask = pnp_pose(pts_3d, frame.undist[idxs_3d], frame.pose)
-        frame.key_pts, frame.undist, frame.desc
         if T is None:
             print("PnP tracking failed")
             (
@@ -140,7 +139,7 @@ def create_frontend(
             or num_tracked < min_features
             or current_keyframe.id > 0
             and (
-                len(current_landmarks) < min_features // 2
+                len(current_landmarks) < min_features * 0.66
                 or avg_parallax > kf_parallax_threshold / 2.0
                 and tracked_lm_ratio < kf_landmark_ratio
             )
@@ -170,7 +169,7 @@ def create_frontend(
             context["current_keyframe"] = frame
             context["last_frame"] = frame
             return frame
-        last_frame, _ = current_context()
+        last_frame, current_keyframe = current_context()
         frame.pose = last_frame.pose
         frame, kf_idxs = match_features(frame)
         frame, kf_idxs = localization(frame, kf_idxs)

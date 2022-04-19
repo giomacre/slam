@@ -35,12 +35,12 @@ def epipolar_ransac(K, query_pts, train_pts):
     if n_inliers < 5:
         return [None] * 2
 
-    train_pts, query_pts = cv.correctMatches(
-        E,
-        train_pts[None, ...].copy(),
-        query_pts[None, ...].copy(),
-    )
-    _, R, t, _ = cv.recoverPose(
+    # train_pts, query_pts = cv.correctMatches(
+    #     E,
+    #     train_pts[None, ...].copy(),
+    #     query_pts[None, ...].copy(),
+    # )
+    _, R, t, mask_pose = cv.recoverPose(
         E,
         train_pts,
         query_pts,
@@ -112,7 +112,6 @@ def ceres_pnp_solver(
 
 
 def pnp_ransac(K, lm_coords, image_coords, T=None):
-    @performance_timer()
     def initial_estimate():
         return cv.solvePnPRansac(
             lm_coords,
@@ -144,36 +143,23 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
             return [None] * 2
         return T, inliers_r
 
-    @performance_timer()
     def ceres_refinement(rot, t, inliers):
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
-        retval_r, T_r, inliers_r = ceres_pnp_solver(
+        retval_l2, T_l2, inliers_l2 = ceres_pnp_solver(
             K,
             T,
             lm_coords[inliers],
             image_coords[inliers],
-            use_robust_loss=True,
-        )
-        if not retval_r:
-            return None, None
-        return T_r, inliers_r
-        retval_l2, T_l2, inliers_l2 = ceres_pnp_solver(
-            K,
-            T_r,
-            lm_coords[inliers][inliers_r],
-            image_coords[inliers][inliers_r],
         )
         if not retval_l2:
             return None, None
-        inliers_r[inliers_r] = inliers_l2
-        return T_l2, inliers_r
+        return T_l2, inliers_l2
 
     retval, rot, t, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
         return [None] * 2
     if ransac_params["p3p_ceres_refinement"]:
-        # inliers = np.arange(len(lm_coords))
         T_r, inliers_r = ceres_refinement(rot, t, inliers)
     else:
         T_r, inliers_r = iterative_refinement(rot, t, inliers)
@@ -183,8 +169,8 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
     mask = np.full(len(lm_coords), False)
     inliers = inliers.flatten()
     mask[inliers] = True
-    if np.count_nonzero(mask) < 0.5 * len(lm_coords):
-        return [None] * 2
+    # if np.count_nonzero(mask) < 0.5 * len(lm_coords):
+    #     return [None] * 2
     return T_r, mask
 
 

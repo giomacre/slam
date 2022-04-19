@@ -3,6 +3,7 @@ from functools import reduce
 import numpy as np
 from .features import create_orb_detector
 from ..utils.slam_logging import log_feature_match
+from ..utils.params import frontend_params
 
 
 def create_lk_orb_detector(undistort, **orb_args):
@@ -20,7 +21,7 @@ def create_lk_orb_detector(undistort, **orb_args):
                 cv.circle(
                     mask_trackings,
                     np.int32(point),
-                    5,
+                    frontend_params["keypoint_radius"],
                     0,
                     thickness=cv.FILLED,
                 )
@@ -33,7 +34,7 @@ def create_lk_orb_detector(undistort, **orb_args):
     return detector
 
 
-@log_feature_match
+# @log_feature_match
 def track_to_new_frame(query_frame, train_frame):
     train_pts = train_frame.key_pts.reshape(-1, 1, 2).copy()
     query_gray, train_gray = (

@@ -46,17 +46,6 @@ def create_orb_detector(undistort, **orb_args):
             )
             n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
-            key_pts = cv.cornerSubPix(
-                np.mean(frame.image, axis=2).astype(np.uint8),
-                key_pts,
-                (3, 3),
-                (-1, -1),
-                (
-                    cv.TermCriteria_EPS + cv.TermCriteria_MAX_ITER,
-                    30,
-                    0.01,
-                ),
-            )
             undist = undistort(key_pts)
             start = (
                 max(frame.observations.keys()) + 1 if len(frame.observations) > 0 else 0
@@ -85,10 +74,6 @@ def create_orb_detector(undistort, **orb_args):
             frame.key_pts = key_pts
             frame.undist = undist
             frame.observations = observations
-        frame.desc = orb.compute(
-            frame.image,
-            cv.KeyPoint_convert(frame.key_pts),
-        )[1]
         return n_extracted, frame
 
     return orb_detector

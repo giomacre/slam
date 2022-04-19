@@ -45,6 +45,7 @@ if __name__ == "__main__":
             frontend_properties = [
                 "max_features",
                 "min_features",
+                "keypoint_radius",
                 "kf_landmark_ratio",
                 "kf_parallax_threshold",
                 "epipolar_scale",

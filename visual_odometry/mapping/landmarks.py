@@ -5,7 +5,6 @@ from ..utils.params import frontend_params
 
 
 def initialize_tracked_landmarks(
-    get_parallax,
     triangulation,
     tracked_frames,
     frame,
@@ -26,20 +25,13 @@ def initialize_tracked_landmarks(
         ref_kf = tracked_frames[kf_id]
         ref_idxs = np.array(ref_idxs)
         curr_idxs = np.array(curr_idxs)
-        parallax = get_parallax(
-            frame.pose,
-            ref_kf.pose,
-            frame.undist[curr_idxs],
-            ref_kf.undist[ref_idxs],
-        )
         pts_3d, good_pts = triangulation(
             frame.pose,
             ref_kf.pose,
             frame.undist[curr_idxs],
             ref_kf.undist[ref_idxs],
         )
-        old_kps = parallax > frontend_params["kf_parallax_threshold"]
-        for i in ref_idxs[old_kps & ~good_pts]:
+        for i in ref_idxs:
             del ref_kf.observations[i].idxs[kf_id]
             del ref_kf.observations[i]
         for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):

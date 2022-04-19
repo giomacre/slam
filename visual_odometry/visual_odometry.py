@@ -68,7 +68,7 @@ def start(video_path):
     )
 
     def process_frame(triangulate_new_points, tracked_frames, image):
-        frame = create_frame(len(tracked_frames), image)
+        frame = create_frame(image, len(tracked_frames))
         frame = frontend(frame)
         tracked_frames += [frame]
         new_points = []
@@ -86,7 +86,6 @@ def start(video_path):
         process_frame,
         partial(
             initialize_tracked_landmarks,
-            get_parallax,
             create_point_triangulator(K),
             tracked_frames,
         ),
