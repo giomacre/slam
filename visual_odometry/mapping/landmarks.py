@@ -31,7 +31,7 @@ def initialize_tracked_landmarks(
             frame.undist[curr_idxs],
             ref_kf.undist[ref_idxs],
         )
-        for i in ref_idxs:
+        for i in ref_idxs[~good_pts]:
             del ref_kf.observations[i].idxs[kf_id]
             del ref_kf.observations[i]
         for i, pt in zip(curr_idxs[good_pts], pts_3d[good_pts]):

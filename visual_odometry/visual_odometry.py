@@ -1,5 +1,4 @@
-from collections import deque
-from functools import partial
+from functools import lru_cache, partial
 from cv2 import undistortPoints
 import numpy as np
 from threading import current_thread
@@ -19,9 +18,9 @@ from .frontend.klt import (
 )
 from .frontend.video import Video
 from .utils.multiview_geometry import (
-    create_point_triangulator,
     epipolar_ransac,
     pnp_ransac,
+    triangulation,
 )
 from .utils.worker import create_thread_context
 from .visualization.mapping import create_map_thread
@@ -86,7 +85,18 @@ def start(video_path):
         process_frame,
         partial(
             initialize_tracked_landmarks,
-            create_point_triangulator(K),
+            partial(
+                triangulation,
+                K,
+                # lru_cache(maxsize=1)(
+                #     lambda: np.hstack(
+                #         (
+                #             K,
+                #             np.array([0, 0, 0]).reshape(3, 1),
+                #         )
+                #     )
+                # ),
+            ),
             tracked_frames,
         ),
         tracked_frames,
