@@ -74,13 +74,7 @@ def track_to_new_frame(query_frame, train_frame):
         ),
     )
     status_reverse = status_reverse.ravel().astype(np.bool)
-    good_matches = (
-        np.linalg.norm(
-            tracked_reverse - train_pts,
-            axis=2,
-        )
-        < 0.5
-    )
+    good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 0.5
     good_matches = good_matches.ravel()
     good_idxs = np.flatnonzero(
         reduce(

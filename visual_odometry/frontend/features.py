@@ -21,7 +21,7 @@ from ssc import ssc
 
 def create_orb_detector(undistort, **orb_args):
     orb = cv.ORB_create(**orb_args)
-    detector = cv.FastFeatureDetector_create(threshold=10)
+    detector = cv.FastFeatureDetector_create()
 
     @log_feature_extraction
     def orb_detector(frame, max_features, mask=None):
@@ -47,7 +47,7 @@ def create_orb_detector(undistort, **orb_args):
             n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
             key_pts = cv.cornerSubPix(
-                np.mean(frame.image, axis=2).astype(np.uint8),
+                cv.cvtColor(frame.image, cv.COLOR_BGR2GRAY),
                 key_pts,
                 (3, 3),
                 (-1, -1),
