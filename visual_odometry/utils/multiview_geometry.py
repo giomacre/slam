@@ -34,13 +34,7 @@ def epipolar_ransac(K, query_pts, train_pts):
     n_inliers = np.count_nonzero(mask)
     if n_inliers < 5:
         return [None] * 2
-
-    # train_pts, query_pts = cv.correctMatches(
-    #     E,
-    #     train_pts[None, ...].copy(),
-    #     query_pts[None, ...].copy(),
-    # )
-    _, R, t, mask_pose = cv.recoverPose(
+    _, R, t, _ = cv.recoverPose(
         E,
         train_pts,
         query_pts,
@@ -137,6 +131,8 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
             useExtrinsicGuess=True,
             flags=cv.SOLVEPNP_ITERATIVE,
         )
+        if inliers_r is None:
+            return [None]*2
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
         if len(inliers_r) < 4:
@@ -146,15 +142,16 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
     def ceres_refinement(rot, t, inliers):
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
-        retval_l2, T_l2, inliers_l2 = ceres_pnp_solver(
+        retval_rl, T_rl, inliers_rl = ceres_pnp_solver(
             K,
             T,
             lm_coords[inliers],
             image_coords[inliers],
+            use_robust_loss=True,
         )
-        if not retval_l2:
+        if not retval_rl:
             return None, None
-        return T_l2, inliers_l2
+        return T_rl, inliers_rl
 
     retval, rot, t, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
@@ -169,8 +166,8 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
     mask = np.full(len(lm_coords), False)
     inliers = inliers.flatten()
     mask[inliers] = True
-    # if np.count_nonzero(mask) < 0.5 * len(lm_coords):
-    #     return [None] * 2
+    if np.count_nonzero(mask) < 4:
+        return [None] * 2
     return T_r, mask
 
 
@@ -194,7 +191,6 @@ def create_point_triangulator(K):
                 current_points.T,
             )
         ).T
-        points_4d = points_4d[points_4d[:, -1] != 0]
         points_4d /= points_4d[:, -1:]
         camera_coords = np.dstack(
             [
