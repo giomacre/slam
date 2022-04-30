@@ -1,6 +1,7 @@
 import os
 import sys
 import cv2 as cv
+from cv2 import goodFeaturesToTrack
 import numpy as np
 from ..mapping.landmarks import create_landmark
 from ..utils.slam_logging import log_feature_match, log_feature_extraction
@@ -21,14 +22,17 @@ from ssc import ssc
 
 def create_orb_detector(undistort, **orb_args):
     orb = cv.ORB_create(**orb_args)
-    detector = cv.FastFeatureDetector_create()
+    detector = cv.FastFeatureDetector_create(
+        threshold=frontend_params["fast_threshold"]
+    )
 
     @log_feature_extraction
     def orb_detector(frame, max_features, mask=None):
         n_extracted = 0
         key_pts = []
         if max_features > 0:
-            key_pts = detector.detect(frame.image, mask=mask)
+            gray_image = cv.cvtColor(frame.image, cv.COLOR_BGR2GRAY)
+            key_pts = detector.detect(gray_image, mask=mask)
             key_pts = sorted(
                 key_pts,
                 key=lambda x: x.response,
@@ -39,7 +43,7 @@ def create_orb_detector(undistort, **orb_args):
         if len(key_pts) > 0:
             key_pts = ssc(
                 key_pts,
-                (min(max_features, len(key_pts)) + 1),
+                min(max_features + 1, len(key_pts)),
                 0.15,
                 frame.image.shape[1],
                 frame.image.shape[0],
@@ -47,14 +51,14 @@ def create_orb_detector(undistort, **orb_args):
             n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
             key_pts = cv.cornerSubPix(
-                cv.cvtColor(frame.image, cv.COLOR_BGR2GRAY),
+                gray_image,
                 key_pts,
-                (3, 3),
-                (-1, -1),
-                (
+                winSize=(3, 3),
+                zeroZone=(-1, -1),
+                criteria=(
                     cv.TermCriteria_EPS + cv.TermCriteria_MAX_ITER,
-                    300,
-                    0.001,
+                    frontend_params["klt_max_iter"],
+                    frontend_params["klt_convergence_threshold"],
                 ),
             )
             undist = undistort(key_pts)

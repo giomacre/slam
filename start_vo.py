@@ -50,6 +50,11 @@ if __name__ == "__main__":
                 "kf_parallax_threshold",
                 "epipolar_scale",
                 "pnp_ceres_chi",
+                "fast_threshold",
+                "klt_window_size",
+                "klt_max_iter",
+                "klt_convergence_threshold",
+                "klt_inlier_threshold",
             ]
             ransac_properties = [
                 "em_threshold",

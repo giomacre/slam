@@ -44,13 +44,22 @@ def track_to_new_frame(query_frame, train_frame):
             train_frame,
         ]
     )
-    tracked_points, status, _ = cv.calcOpticalFlowPyrLK(
+    window = [frontend_params["klt_window_size"]] * 2
+    criteria = (
+        cv.TermCriteria_EPS + cv.TermCriteria_MAX_ITER,
+        frontend_params["klt_max_iter"],
+        frontend_params["klt_convergence_threshold"],
+    )
+    tracked_points, status, errors = cv.calcOpticalFlowPyrLK(
         train_gray,
         query_gray,
         train_pts,
         None,
         flags=cv.OPTFLOW_LK_GET_MIN_EIGENVALS,
+        winSize=window,
+        criteria=criteria,
     )
+    low_err = errors.ravel() < frontend_params["klt_inlier_threshold"]
     status = status.ravel().astype(np.bool)
     inside_limits = reduce(
         np.bitwise_and,
@@ -72,6 +81,8 @@ def track_to_new_frame(query_frame, train_frame):
                 cv.OPTFLOW_LK_GET_MIN_EIGENVALS,
             ]
         ),
+        winSize=window,
+        criteria=criteria,
     )
     status_reverse = status_reverse.ravel().astype(np.bool)
     good_matches = np.abs(tracked_reverse - train_pts).max(axis=2) < 0.5
@@ -81,6 +92,7 @@ def track_to_new_frame(query_frame, train_frame):
             np.bitwise_and,
             [
                 status,
+                low_err,
                 inside_limits,
                 status_reverse,
                 good_matches,

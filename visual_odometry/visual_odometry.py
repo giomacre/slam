@@ -34,6 +34,7 @@ np.set_printoptions(precision=3, suppress=True)
 def start(video_path):
     video = Video(video_path)
     video_stream = video.get_video_stream()
+    tracked_frames = []
 
     K, Kinv, d = get_calibration_params()
     undistort = (
@@ -50,6 +51,7 @@ def start(video_path):
 
     get_parallax = partial(compute_parallax, K, Kinv)
     frontend = create_frontend(
+        tracked_frames,
         create_lk_orb_detector(undistort),
         track_to_new_frame,
         partial(epipolar_ransac, K),
@@ -80,7 +82,6 @@ def start(video_path):
         )
         return lambda: [f() for f in [await_draw, await_map]]
 
-    tracked_frames = []
     process_frame = partial(
         process_frame,
         partial(

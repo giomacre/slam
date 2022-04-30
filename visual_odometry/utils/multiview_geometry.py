@@ -41,7 +41,7 @@ def epipolar_ransac(K, query_pts, train_pts):
         K,
         mask=mask.copy(),
     )
-    T = construct_pose(R.T, -R.T @ t * frontend_params["epipolar_scale"])
+    T = construct_pose(R.T, -R.T @ t)
     mask = mask.astype(np.bool).ravel()
     return T, mask
 

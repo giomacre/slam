@@ -7,6 +7,7 @@ import numpy as np
 
 
 def create_frontend(
+    tracked_frames,
     detector,
     tracker,
     epipolar_ransac,
@@ -47,17 +48,26 @@ def create_frontend(
         # Filter outliers with RANSAC
         frame.key_pts = tracked
         frame.undist = undistort(frame.key_pts)
-        T, inliers = epipolar_ransac(
+        T_kc, inliers = epipolar_ransac(
             frame.undist,
             last_frame.undist[train_idxs],
         )
-        if T is None:
+        if T_kc is None:
             print("Ess. Matrix failed")
         if inliers is not None:
+            # kf_idxs = kf_idxs[inliers]
             train_idxs = train_idxs[inliers]
             frame.key_pts = frame.key_pts[inliers]
             frame.undist = frame.undist[inliers]
-            frame.pose = T @ last_frame.pose
+            scale = (
+                np.linalg.norm(
+                    (np.linalg.inv(tracked_frames[-2].pose) @ last_frame.pose)[:3, 3]
+                )
+                if frame.id > 1
+                else frontend_params["epipolar_scale"]
+            )
+            T_kc[:3, 3] *= scale
+            frame.pose = current_keyframe.pose @ T_kc
         kf_idxs = np.array(
             [
                 *(
