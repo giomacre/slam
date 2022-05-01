@@ -49,7 +49,6 @@ if __name__ == "__main__":
                 "kf_landmark_ratio",
                 "kf_parallax_threshold",
                 "epipolar_scale",
-                "pnp_ceres_chi",
                 "fast_threshold",
                 "klt_window_size",
                 "klt_max_iter",
@@ -62,7 +61,9 @@ if __name__ == "__main__":
                 "p3p_threshold",
                 "p3p_confidence",
                 "p3p_iterations",
-                "p3p_ceres_refinement",
+                "pnp_ceres_refinement",
+                "pnp_ceres_use_huber_loss",
+                "pnp_ceres_huber_threshold",
             ]
             visualization_properties = [
                 "follow_camera",

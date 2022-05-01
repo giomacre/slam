@@ -1,13 +1,12 @@
+from collections import deque
 from functools import partial
 from operator import itemgetter
 
-from ..utils.slam_logging import performance_timer
 from ..utils.params import frontend_params
 import numpy as np
 
 
 def create_frontend(
-    tracked_frames,
     detector,
     tracker,
     epipolar_ransac,
@@ -31,55 +30,55 @@ def create_frontend(
     )
 
     context = dict(
-        last_frame=None,
+        tracked_frames=deque([None, None], maxlen=2),
         current_keyframe=None,
     )
     current_context = partial(
-        itemgetter("last_frame", "current_keyframe"),
+        itemgetter("tracked_frames", "current_keyframe"),
         context,
     )
 
     def match_features(frame):
-        last_frame, current_keyframe = current_context()
+        (frame_t1, _), current_keyframe = current_context()
         tracked, train_idxs = tracker(
             frame,
-            last_frame,
+            frame_t1,
         )
         # Filter outliers with RANSAC
         frame.key_pts = tracked
         frame.undist = undistort(frame.key_pts)
+        kf_idxs = np.array(
+            [frame_t1.observations[i].idxs[current_keyframe.id] for i in train_idxs]
+        )
         T_kc, inliers = epipolar_ransac(
             frame.undist,
-            last_frame.undist[train_idxs],
+            current_keyframe.undist[kf_idxs],
         )
         if T_kc is None:
-            print("Ess. Matrix failed")
+            print("RANSAC filtering failed")
         if inliers is not None:
-            # kf_idxs = kf_idxs[inliers]
-            train_idxs = train_idxs[inliers]
+            kf_idxs = kf_idxs[inliers]
             frame.key_pts = frame.key_pts[inliers]
             frame.undist = frame.undist[inliers]
-            scale = (
-                np.linalg.norm(
-                    (np.linalg.inv(tracked_frames[-2].pose) @ last_frame.pose)[:3, 3]
-                )
+        return frame, kf_idxs, T_kc
+
+    def localization(frame, kf_idxs, T_kc):
+        (frame_t1, frame_t2), current_keyframe = current_context()
+
+        def adjust_scale(T_kc):
+            T_kl = np.linalg.inv(frame_t1.pose) @ current_keyframe.pose
+            kf_scale = np.linalg.norm(T_kl[:3, 3])
+            last_scale = (
+                np.linalg.norm((np.linalg.inv(frame_t2.pose) @ frame_t1.pose)[:3, 3])
                 if frame.id > 1
                 else frontend_params["epipolar_scale"]
             )
-            T_kc[:3, 3] *= scale
-            frame.pose = current_keyframe.pose @ T_kc
-        kf_idxs = np.array(
-            [
-                *(
-                    last_frame.observations[i].idxs[current_keyframe.id]
-                    for i in train_idxs
-                )
-            ]
-        )
-        return frame, kf_idxs
+            if T_kc is None:
+                T_kc = T_kl
+                T_kc[:3, 3] /= kf_scale
+            T_kc[:3, 3] *= kf_scale + last_scale
+            return T_kc
 
-    def localization(frame, kf_idxs):
-        _, current_keyframe = current_context()
         values = tuple(
             np.array(a)
             for a in zip(
@@ -93,8 +92,10 @@ def create_frontend(
         pts_3d, idxs_3d = values if len(values) > 0 else [[]] * 2
         if len(pts_3d) < 4:
             print("Not enough landmarks for PnP")
+            T_kc = adjust_scale(T_kc)
+            frame.pose = current_keyframe.pose @ T_kc
             return frame, kf_idxs
-        T, mask = pnp_pose(pts_3d, frame.undist[idxs_3d], frame.pose)
+        T, mask = pnp_pose(pts_3d, frame.undist[idxs_3d])
         if T is None:
             print("PnP tracking failed")
             (
@@ -103,6 +104,8 @@ def create_frontend(
                 frame.desc,
             ) = [np.array([])] * 3
             kf_idxs = np.array([])
+            T_kc = adjust_scale(T_kc)
+            frame.pose = current_keyframe.pose @ T_kc
             return frame, kf_idxs
         outliers = idxs_3d[~mask]
         inliers = np.full(len(frame.key_pts), True)
@@ -159,11 +162,11 @@ def create_frontend(
                 max_features - num_tracked,
             )
             if n_ret == 0:
-                context["last_frame"] = frame
+                context["tracked_frames"].appendleft(frame)
                 return frame
             frame.is_keyframe = True
             context["current_keyframe"] = frame
-        context["last_frame"] = frame
+        context["tracked_frames"].appendleft(frame)
         return frame
 
     def frontend(frame):
@@ -177,12 +180,10 @@ def create_frontend(
             frame.pose = np.eye(4)
             frame.is_keyframe = True
             context["current_keyframe"] = frame
-            context["last_frame"] = frame
+            context["tracked_frames"].appendleft(frame)
             return frame
-        last_frame, current_keyframe = current_context()
-        frame.pose = last_frame.pose
-        frame, kf_idxs = match_features(frame)
-        frame, kf_idxs = localization(frame, kf_idxs)
+        frame, kf_idxs, T_kc = match_features(frame)
+        frame, kf_idxs = localization(frame, kf_idxs, T_kc)
         frame = transfer_observations(frame, kf_idxs)
         return keyframe_recognition(frame, kf_idxs)
 

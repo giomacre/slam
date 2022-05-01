@@ -1,13 +1,5 @@
-from functools import reduce
 import sys
 import os
-from click import option
-import numpy as np
-import cv2 as cv
-
-from ..frontend.camera_calibration import to_homogeneous, to_image_coords
-from .slam_logging import log_pose_estimation, log_triangulation, performance_timer
-from .params import frontend_params, ransac_params
 
 sys.path.append(
     os.path.join(
@@ -19,31 +11,11 @@ sys.path.append(
 from geometry import SE3
 import PyCeresFactors as factors
 import PyCeres as ceres
-
-# @log_pose_estimation
-def epipolar_ransac(K, query_pts, train_pts):
-    if len(train_pts) < 5:
-        return [None] * 2
-    E, mask = cv.findEssentialMat(
-        train_pts,
-        query_pts,
-        K,
-        prob=ransac_params["em_confidence"],
-        threshold=ransac_params["em_threshold"],
-    )
-    n_inliers = np.count_nonzero(mask)
-    if n_inliers < 5:
-        return [None] * 2
-    _, R, t, _ = cv.recoverPose(
-        E,
-        train_pts,
-        query_pts,
-        K,
-        mask=mask.copy(),
-    )
-    T = construct_pose(R.T, -R.T @ t)
-    mask = mask.astype(np.bool).ravel()
-    return T, mask
+from ..utils.params import ransac_params
+import numpy as np
+import cv2 as cv
+from .camera_calibration import to_image_coords, to_homogeneous
+from ..multiview_geometry import construct_pose
 
 
 def ceres_pnp_solver(
@@ -51,14 +23,17 @@ def ceres_pnp_solver(
     T,
     world_pts,
     image_pts,
-    use_robust_loss=False,
 ):
-    chi_err = frontend_params["pnp_ceres_chi"]
     T0 = SE3.fromH(T)
     T_curr = T0.array()
     Kf = K.astype(np.float32)
     problem = ceres.Problem()
-    robust_loss = ceres.HuberLoss(np.sqrt(chi_err)) if use_robust_loss else None
+    chi_err = ransac_params["pnp_ceres_huber_threshold"]
+    robust_loss = (
+        ceres.HuberLoss(np.sqrt(chi_err))
+        if ransac_params["pnp_ceres_use_huber_loss"]
+        else None
+    )
     problem.AddParameterBlock(
         T_curr,
         7,
@@ -105,7 +80,7 @@ def ceres_pnp_solver(
     )
 
 
-def pnp_ransac(K, lm_coords, image_coords, T=None):
+def pnp_ransac(K, lm_coords, image_coords):
     def initial_estimate():
         return cv.solvePnPRansac(
             lm_coords,
@@ -118,7 +93,7 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
         )
 
     def iterative_refinement(rotvec, tvec, inliers):
-        _, rot, t, inliers_r = cv.solvePnPRansac(
+        retval, rot, t, inliers_r = cv.solvePnPRansac(
             lm_coords[inliers],
             image_coords[inliers],
             K,
@@ -131,12 +106,10 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
             useExtrinsicGuess=True,
             flags=cv.SOLVEPNP_ITERATIVE,
         )
-        if inliers_r is None:
+        if not retval or len(inliers_r) < 4:
             return [None] * 2
         R = cv.Rodrigues(rot)[0]
         T = construct_pose(R.T, -R.T @ t)
-        if len(inliers_r) < 4:
-            return [None] * 2
         return T, inliers_r
 
     def ceres_refinement(rot, t, inliers):
@@ -147,7 +120,6 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
             T,
             lm_coords[inliers],
             image_coords[inliers],
-            use_robust_loss=True,
         )
         if not retval_rl:
             return None, None
@@ -156,7 +128,7 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
     retval, rot, t, inliers = initial_estimate()
     if not retval or len(inliers) < 4:
         return [None] * 2
-    if ransac_params["p3p_ceres_refinement"]:
+    if ransac_params["pnp_ceres_refinement"]:
         T_r, inliers_r = ceres_refinement(rot, t, inliers)
     else:
         T_r, inliers_r = iterative_refinement(rot, t, inliers)
@@ -166,59 +138,6 @@ def pnp_ransac(K, lm_coords, image_coords, T=None):
     mask = np.full(len(lm_coords), False)
     inliers = inliers.flatten()
     mask[inliers] = True
-    if np.count_nonzero(mask) < 4:
+    if np.count_nonzero(mask) < 0.5 * len(lm_coords):
         return [None] * 2
     return T_r, mask
-
-
-# @log_triangulation
-def triangulation(
-    K,
-    current_pose,
-    reference_pose,
-    current_points,
-    reference_points,
-):
-    current_extrinsics = np.linalg.inv(current_pose)[:3]
-    reference_extrinsics = np.linalg.inv(reference_pose)[:3]
-    points_4d = np.array(
-        cv.triangulatePoints(
-            (K @ reference_extrinsics),
-            (K @ current_extrinsics),
-            reference_points.T,
-            current_points.T,
-        )
-    ).T
-    points_4d /= points_4d[:, -1:]
-    camera_coords = np.dstack(
-        [
-            (extrinsics @ points_4d.T).T
-            for extrinsics in [
-                current_extrinsics,
-                reference_extrinsics,
-            ]
-        ]
-    ).T
-    projected = to_image_coords(K, camera_coords)
-    low_err = reduce(
-        np.bitwise_and,
-        (
-            np.linalg.norm(a - b.T, axis=0) < ransac_params["p3p_threshold"]
-            for a, b in zip(
-                projected,
-                [current_points, reference_points],
-            )
-        ),
-    )
-    in_front = reduce(
-        np.bitwise_and,
-        (pts[2, :] > 0 for pts in camera_coords),
-    ).T
-    good_pts = in_front & low_err
-    return points_4d[..., :3], good_pts
-
-
-def construct_pose(R, t):
-    return np.vstack(
-        (np.hstack((R, t)), [0, 0, 0, 1]),
-    )
