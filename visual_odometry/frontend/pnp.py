@@ -1,6 +1,8 @@
 import sys
 import os
 
+from visual_odometry.utils.slam_logging import performance_timer
+
 sys.path.append(
     os.path.join(
         os.path.dirname(sys.argv[0]),
@@ -18,6 +20,7 @@ from .camera_calibration import to_image_coords, to_homogeneous
 from ..multiview_geometry import construct_pose
 
 
+@performance_timer()
 def ceres_pnp_solver(
     K,
     T,
@@ -48,29 +51,18 @@ def ceres_pnp_solver(
         problem.AddResidualBlock(factor, robust_loss, T_curr)
 
     options = ceres.SolverOptions()
-    options.linear_solver_type = ceres.LinearSolverType.DENSE_QR
+    options.linear_solver_type = ceres.LinearSolverType.ITERATIVE_SCHUR
     options.trust_region_strategy_type = (
         ceres.TrustRegionStrategyType.LEVENBERG_MARQUARDT
     )
     options.num_threads = 1
     options.function_tolerance = 1e-3
+    options.max_num_iterations = 20
     options.minimizer_progress_to_stdout = False
     summary = ceres.Summary()
     ceres.Solve(options, problem, summary)
     T = SE3(T_curr).H()
-    world_h = to_homogeneous(world_pts.squeeze().T)
-    camera_coords = (np.linalg.inv(T) @ world_h)[:3, ...]
-    in_front = camera_coords[2, ...] > 0.0
-    image_pts = image_pts.squeeze().T
-    reproj_err = np.linalg.norm(
-        image_pts
-        - to_image_coords(
-            K,
-            camera_coords,
-        ),
-        axis=0,
-    )
-    inliers = (reproj_err < (ransac_params["p3p_threshold"])) & in_front
+    inliers = reprojection_filter(K, T, world_pts, image_pts)
     if np.count_nonzero(inliers) < 4:
         return False, None, None
     return (
@@ -89,28 +81,30 @@ def pnp_ransac(K, lm_coords, image_coords):
             distCoeffs=None,
             reprojectionError=ransac_params["p3p_threshold"],
             confidence=ransac_params["p3p_confidence"],
-            flags=cv.SOLVEPNP_P3P,
+            iterationsCount=ransac_params["p3p_iterations"],
+            flags=cv.SOLVEPNP_AP3P,
         )
 
     def iterative_refinement(rotvec, tvec, inliers):
-        retval, rot, t, inliers_r = cv.solvePnPRansac(
+        rotvec, tvec = cv.solvePnPRefineLM(
             lm_coords[inliers],
             image_coords[inliers],
             K,
-            None,
-            rotvec,
-            tvec,
-            reprojectionError=ransac_params["p3p_threshold"],
-            confidence=ransac_params["p3p_confidence"],
-            iterationsCount=ransac_params["p3p_iterations"],
-            useExtrinsicGuess=True,
-            flags=cv.SOLVEPNP_ITERATIVE,
+            distCoeffs=None,
+            rvec=rotvec,
+            tvec=tvec,
+            criteria=(cv.TERM_CRITERIA_COUNT + cv.TERM_CRITERIA_EPS, 20, 1e-3),
         )
-        if not retval or len(inliers_r) < 4:
-            return [None] * 2
-        R = cv.Rodrigues(rot)[0]
-        T = construct_pose(R.T, -R.T @ t)
-        return T, inliers_r
+
+        R = cv.Rodrigues(rotvec)[0]
+        T = construct_pose(R.T, -R.T @ tvec)
+        inliers = reprojection_filter(
+            K,
+            T,
+            lm_coords[inliers],
+            image_coords[inliers],
+        )
+        return T, inliers
 
     def ceres_refinement(rot, t, inliers):
         R = cv.Rodrigues(rot)[0]
@@ -141,3 +135,19 @@ def pnp_ransac(K, lm_coords, image_coords):
     if np.count_nonzero(mask) < 0.5 * len(lm_coords):
         return [None] * 2
     return T_r, mask
+
+
+def reprojection_filter(K, T, world_coords, image_coords):
+    world_h = to_homogeneous(world_coords.squeeze().T)
+    camera_coords = (np.linalg.inv(T) @ world_h)[:3, ...]
+    in_front = camera_coords[2, ...] > 0.0
+    image_pts = image_coords.squeeze().T
+    reproj_err = np.linalg.norm(
+        image_pts
+        - to_image_coords(
+            K,
+            camera_coords,
+        ),
+        axis=0,
+    )
+    return (reproj_err < (ransac_params["p3p_threshold"])) & in_front
