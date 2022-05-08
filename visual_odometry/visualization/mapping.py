@@ -88,10 +88,10 @@ def draw_map(
         return
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
     display.Activate(render_state)
-    gl.glLineWidth(1)
+    gl.glLineWidth(3)
     gl.glColor(1.0, 0.85, 0.3)
     pango.glDrawLineStrip(positions)
-    gl.glLineWidth(2)
+    gl.glLineWidth(3)
     gl.glColor(0.4, 0.0, 1.0)
     pango.glDrawFrustum(
         Kinv,

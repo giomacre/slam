@@ -4,7 +4,7 @@ import cv2 as cv
 
 from .frontend.camera_calibration import to_image_coords
 from .utils.slam_logging import log_pose_estimation, log_triangulation
-from .utils.params import ransac_params
+from .utils.params import ransac_params, frontend_params
 
 
 # @log_pose_estimation
@@ -21,19 +21,21 @@ def epipolar_ransac(K, query_pts, train_pts):
     n_inliers = np.count_nonzero(mask)
     if n_inliers < 0.5 * len(query_pts):
         return [None] * 2
+    mask = mask.astype(np.bool).ravel()
+    return E, mask
+
+
+def epipolar_pose(K, E, query_pts, train_pts):
     retval, R, t, _ = cv.recoverPose(
         E,
         train_pts,
         query_pts,
         K,
-        mask=mask.copy(),
     )
-    if retval:
-        T = construct_pose(R.T, -R.T @ t)
-    else:
-        T = None
-    mask = mask.astype(np.bool).ravel()
-    return T, mask
+    if not retval:
+        return None
+    T = construct_pose(R.T, -R.T @ t)
+    return T
 
 
 # @log_triangulation

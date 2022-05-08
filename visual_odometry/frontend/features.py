@@ -1,5 +1,6 @@
 import os
 import sys
+from charset_normalizer import detect
 import cv2 as cv
 from cv2 import goodFeaturesToTrack
 import numpy as np
@@ -20,36 +21,36 @@ from ssc import ssc
 # Detectors
 
 
-def create_orb_detector(undistort, **orb_args):
-    orb = cv.ORB_create(**orb_args)
+def create_feature_detector(undistort):
     detector = cv.FastFeatureDetector_create(
-        threshold=frontend_params["fast_threshold"]
-    )
+        threshold=frontend_params["fast_threshold"],
+    ).detect
 
     @log_feature_extraction
-    def orb_detector(frame, max_features, mask=None):
+    def feature_detector(frame, max_features, mask=None):
         n_extracted = 0
         key_pts = []
         if max_features > 0:
             gray_image = cv.cvtColor(frame.image, cv.COLOR_BGR2GRAY)
-            key_pts = detector.detect(gray_image, mask=mask)
+            key_pts = detector(gray_image, mask)
             key_pts = sorted(
                 key_pts,
                 key=lambda x: x.response,
                 reverse=True,
             )
-        if len(key_pts) == 0 and max_features > 0:
+        n_extracted = len(key_pts)
+        if n_extracted == 0 and max_features > 0:
             return 0, frame
-        if len(key_pts) > 0:
+        if n_extracted > 0:
             key_pts = ssc(
                 key_pts,
-                min(max_features + 1, len(key_pts)),
+                min(max_features, len(key_pts)) + 1,
                 0.15,
                 frame.image.shape[1],
                 frame.image.shape[0],
             )
-            n_extracted = len(key_pts)
             key_pts = cv.KeyPoint_convert(key_pts)
+            n_extracted = len(key_pts)
             key_pts = cv.cornerSubPix(
                 gray_image,
                 key_pts,
@@ -62,9 +63,7 @@ def create_orb_detector(undistort, **orb_args):
                 ),
             )
             undist = undistort(key_pts)
-            start = (
-                max(frame.observations.keys()) + 1 if len(frame.observations) > 0 else 0
-            )
+            start = max(frame.landmarks.keys()) + 1 if len(frame.landmarks) > 0 else 0
             observations = {
                 i: create_landmark(frame, i)
                 for i in range(
@@ -85,10 +84,10 @@ def create_orb_detector(undistort, **orb_args):
                         undist,
                     ]
                 )
-                observations |= frame.observations
+                observations |= frame.landmarks
             frame.key_pts = key_pts
             frame.undist = undist
-            frame.observations = observations
+            frame.landmarks = observations
         return n_extracted, frame
 
-    return orb_detector
+    return feature_detector

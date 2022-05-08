@@ -26,11 +26,11 @@ def create_drawer_thread(
 
     def draw_task(frames):
         observations = []
-        for pt in frames[-1].observations.values():
+        for pt in frames[-1].landmarks.values():
             last_n = reversed(
                 [
                     *islice(
-                        reversed(pt.idxs.items()),
+                        reversed(pt.observations.items()),
                         n_segments + 1,
                     )
                 ]
@@ -58,13 +58,13 @@ def draw_matches(on_quit, image, observations):
                 image_with_matches,
                 [pts],
                 isClosed=False,
-                color=(128, 0, 0),
+                color=(0, 255, 0),
                 thickness=1,
             )
         cv.circle(
             image_with_matches,
             pts[-1],
-            radius=2,
+            radius=3,
             color=(0, 0, 255),
         )
     cv.imshow("", image_with_matches)

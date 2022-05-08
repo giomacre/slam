@@ -11,12 +11,13 @@ from .frontend.camera_calibration import (
 )
 from .frontend import create_frontend
 from .frontend.frame import create_frame
-from .frontend.klt import (
-    create_lk_orb_detector,
+from .frontend.tracking import (
+    create_lk_feature_detector,
     track_to_new_frame,
 )
 from .frontend.video import Video
 from .multiview_geometry import (
+    epipolar_pose,
     epipolar_ransac,
     triangulation,
 )
@@ -50,16 +51,17 @@ def start(video_path):
 
     get_parallax = partial(compute_parallax, K, Kinv)
     frontend = create_frontend(
-        create_lk_orb_detector(undistort),
+        create_lk_feature_detector(undistort),
         track_to_new_frame,
         partial(epipolar_ransac, K),
+        partial(epipolar_pose, K),
         undistort,
         lambda *a: np.mean(get_parallax(*a)),
         partial(pnp_ransac, K),
     )
 
     thread_context = create_thread_context()
-    send_draw_task = create_drawer_thread(thread_context)
+    send_draw_task = create_drawer_thread(thread_context, n_segments=5)
     send_map_task = create_map_thread(
         (800, 600),
         Kinv,
@@ -84,6 +86,7 @@ def start(video_path):
         process_frame,
         partial(
             initialize_tracked_landmarks,
+            get_parallax,
             partial(triangulation, K),
             tracked_frames,
         ),
