@@ -21,6 +21,7 @@ def create_map_thread(windows_size, Kinv, thread_context):
         render_state=None,
         display=None,
         poses=[],
+        true_positions=[],
         positions=[],
         map_points={"coords": [], "colors": []},
     )
@@ -49,11 +50,12 @@ def create_map_thread(windows_size, Kinv, thread_context):
     )
 
     # @performance_timer()
-    def prepare_task(frames, new_points):
-        pose = frames[-1].pose
+    def prepare_task(frames, new_points, ground_truth):
+        last_frame = frames[-1]
         map_points = [(p.coords, p.color) for p in new_points[::5]]
         return worker(
-            pose,
+            last_frame.pose,
+            ground_truth[last_frame.id] if last_frame.id < len(ground_truth) else None,
             map_points,
         )
 
@@ -65,17 +67,21 @@ def draw_map(
     Kinv,
     video_size,
     pose=None,
+    ground_truth=None,
     new_points=None,
 ):
     (
         render_state,
         display,
         poses,
+        true_trajectory,
         positions,
         map_points,
     ) = render_context()
     if pose is not None:
         poses += [pose]
+        if ground_truth is not None:
+            true_trajectory += [ground_truth[:3, 3:]]
         positions += [pose[:3, 3:]]
         if len(new_points) > 0:
             if visualization_params["follow_camera"]:
@@ -91,6 +97,8 @@ def draw_map(
     gl.glLineWidth(3)
     gl.glColor(1.0, 0.85, 0.3)
     pango.glDrawLineStrip(positions)
+    gl.glColor(0.0, 0.65, 0.1)
+    pango.glDrawLineStrip(true_trajectory)
     gl.glLineWidth(3)
     gl.glColor(0.4, 0.0, 1.0)
     pango.glDrawFrustum(
@@ -100,7 +108,7 @@ def draw_map(
         frontend_params["epipolar_scale"],
     )
     if len(map_points["coords"]) > 0:
-        gl.glPointSize(2)
+        gl.glPointSize(1)
         pango.DrawPoints(
             map_points["coords"],
             map_points["colors"],

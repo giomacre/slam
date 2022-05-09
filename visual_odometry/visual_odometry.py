@@ -1,4 +1,4 @@
-from functools import lru_cache, partial
+from functools import partial
 from cv2 import undistortPoints
 import numpy as np
 from threading import current_thread
@@ -31,7 +31,7 @@ from .mapping.landmarks import initialize_tracked_landmarks
 np.set_printoptions(precision=3, suppress=True)
 
 
-def start(video_path):
+def start(video_path, ground_truth_path):
     video = Video(video_path)
     video_stream = video.get_video_stream()
     tracked_frames = []
@@ -68,7 +68,7 @@ def start(video_path):
         thread_context,
     )
 
-    def process_frame(triangulate_new_points, tracked_frames, image):
+    def process_frame(triangulate_new_points, poses, tracked_frames, image):
         frame = create_frame(image, len(tracked_frames))
         frame = frontend(frame)
         tracked_frames += [frame]
@@ -79,8 +79,21 @@ def start(video_path):
         await_map = send_map_task(
             tracked_frames,
             new_points,
+            poses,
         )
         return lambda: [f() for f in [await_draw, await_map]]
+
+    poses = []
+    if ground_truth_path is not None:
+        D = np.loadtxt(ground_truth_path).reshape(-1, 3, 4)
+        for i in range(len(D)):
+            T = np.vstack(
+                [
+                    D[i],
+                    np.array([0, 0, 0, 1]),
+                ]
+            )
+            poses += [T]
 
     process_frame = partial(
         process_frame,
@@ -90,6 +103,7 @@ def start(video_path):
             partial(triangulation, K),
             tracked_frames,
         ),
+        poses,
         tracked_frames,
     )
     thread_context.start()

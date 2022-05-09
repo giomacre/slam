@@ -1,8 +1,6 @@
 import os
 import sys
-from charset_normalizer import detect
 import cv2 as cv
-from cv2 import goodFeaturesToTrack
 import numpy as np
 from ..mapping.landmarks import create_landmark
 from ..utils.slam_logging import log_feature_match, log_feature_extraction

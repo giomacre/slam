@@ -25,7 +25,7 @@
     "p3p_confidence": 0.99,
     "p3p_iterations": 100,
     "pnp_ceres_refinement": false,
-    "pnp_ceres_use_huber_loss": true,
-    "pnp_ceres_huber_threshold": 3.2189,
+    "pnp_ceres_use_huber_loss": false,
+    "pnp_ceres_huber_threshold": 3.0,
     "follow_camera": true
 }

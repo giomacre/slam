@@ -108,10 +108,15 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "-c",
-        "--camera_params",
+        "-p",
+        "--params",
         type=check_params,
         required=True,
     )
+    parser.add_argument(
+        "-t",
+        "--ground_truth",
+        required=False,
+    )
     args = parser.parse_args()
-    start(args.video_path)
+    start(args.video_path, args.ground_truth)

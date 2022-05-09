@@ -28,11 +28,11 @@ def ceres_pnp_solver(
 ):
     T0 = SE3.fromH(T)
     T_curr = T0.array()
-    Kf = K.astype(np.float32)
+    fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
     problem = ceres.Problem()
-    chi_err = ransac_params["pnp_ceres_huber_threshold"]
-    robust_loss = (
-        ceres.HuberLoss(np.sqrt(chi_err))
+    huber_threshold = ransac_params["pnp_ceres_huber_threshold"]
+    loss_function = (
+        ceres.HuberLoss(huber_threshold)
         if ransac_params["pnp_ceres_use_huber_loss"]
         else None
     )
@@ -43,11 +43,18 @@ def ceres_pnp_solver(
     )
     for i in range(len(world_pts)):
         factor = factors.SE3ReprojectionFactor(
-            Kf,
+            fx,
+            fy,
+            cx,
+            cy,
             image_pts[i].T,
             world_pts[i].T,
         )
-        problem.AddResidualBlock(factor, robust_loss, T_curr)
+        problem.AddResidualBlock(
+            factor,
+            loss_function,
+            T_curr,
+        )
 
     options = ceres.SolverOptions()
     options.linear_solver_type = ceres.LinearSolverType.ITERATIVE_SCHUR

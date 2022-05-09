@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, OrderedDict
+from typing import OrderedDict
 import numpy as np
 
 
