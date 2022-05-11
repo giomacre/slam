@@ -80,7 +80,7 @@ def ceres_pnp_solver(
     )
 
 
-@performance_timer()
+# @performance_timer()
 def pnp_refine(K, rotvec, tvec, world_pts, img_pts):
     def iterative_refinement(rotvec, tvec):
         rotvec, tvec = cv.solvePnPRefineLM(

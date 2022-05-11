@@ -36,6 +36,7 @@ def create_drawer_thread(
                 ]
             )
             observations += [last_n]
+        
         return worker(
             frames[-1].image,
             [

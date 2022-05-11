@@ -63,27 +63,37 @@ def start(video_path, ground_truth_path):
     thread_context = create_thread_context()
     send_draw_task = create_drawer_thread(thread_context, n_segments=5)
     send_map_task = create_map_thread(
-        (800, 600),
+        (850, 600),
         Kinv,
         thread_context,
     )
 
-    def process_frame(triangulate_new_points, poses, tracked_frames, image):
+    def process_frame(
+        triangulate_new_points,
+        ground_truth_poses,
+        tracked_frames,
+        image,
+    ):
         frame = create_frame(image, len(tracked_frames))
         frame = frontend(frame)
         tracked_frames += [frame]
         new_points = []
+        await_map = lambda: None
         if frame.is_keyframe:
             new_points = triangulate_new_points(frame)
+            true_pose = None
+            if frame.id < len(ground_truth_poses):
+                true_pose = ground_truth_poses[frame.id]
+            await_map = send_map_task(
+                frame,
+                new_points,
+                true_pose,
+            )
         await_draw = send_draw_task(tracked_frames)
-        await_map = send_map_task(
-            tracked_frames,
-            new_points,
-            poses,
-        )
+
         return lambda: [f() for f in [await_draw, await_map]]
 
-    poses = []
+    ground_truth_poses = []
     if ground_truth_path is not None:
         D = np.loadtxt(ground_truth_path).reshape(-1, 3, 4)
         for i in range(len(D)):
@@ -93,7 +103,7 @@ def start(video_path, ground_truth_path):
                     np.array([0, 0, 0, 1]),
                 ]
             )
-            poses += [T]
+            ground_truth_poses += [T]
 
     process_frame = partial(
         process_frame,
@@ -103,13 +113,13 @@ def start(video_path, ground_truth_path):
             partial(triangulation, K),
             tracked_frames,
         ),
-        poses,
+        ground_truth_poses,
         tracked_frames,
     )
     thread_context.start()
     for image in video_stream:
         wait_visualization = process_frame(image)
-        # wait_visualization()
+        wait_visualization()
         if thread_context.is_closed:
             break
     thread_context.wait_close()

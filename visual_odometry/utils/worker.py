@@ -78,12 +78,13 @@ def create_worker(
             partial(queue.get, timeout=timeout),
             None,
         ):
-            if thread_context.is_closed:
-                break
+            with thread_context.__close_cond__:
+                if thread_context.is_closed:
+                    while not queue.empty():
+                        queue.get()
+                        queue.task_done()
+                    break
             target(*args)
-            queue.task_done()
-        while not queue.empty():
-            queue.get()
             queue.task_done()
         print(f"{current_thread()} exiting.")
 

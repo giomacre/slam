@@ -50,12 +50,11 @@ def create_map_thread(windows_size, Kinv, thread_context):
     )
 
     # @performance_timer()
-    def prepare_task(frames, new_points, ground_truth):
-        last_frame = frames[-1]
+    def prepare_task(frame, new_points, ground_truth):
         map_points = [(p.coords, p.color) for p in new_points[::5]]
         return worker(
-            last_frame.pose,
-            ground_truth[last_frame.id] if last_frame.id < len(ground_truth) else None,
+            frame.pose,
+            ground_truth,
             map_points,
         )
 
