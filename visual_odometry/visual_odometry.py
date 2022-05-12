@@ -119,7 +119,7 @@ def start(video_path, ground_truth_path):
     thread_context.start()
     for image in video_stream:
         wait_visualization = process_frame(image)
-        wait_visualization()
+        # wait_visualization()
         if thread_context.is_closed:
             break
     thread_context.wait_close()

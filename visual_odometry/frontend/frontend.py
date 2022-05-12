@@ -163,11 +163,8 @@ def create_frontend(
             avg_parallax > kf_parallax_threshold
             or num_tracked < min_features
             or current_keyframe.id > 0
-            and (
-                len(current_landmarks) < min_features * 0.66
-                or avg_parallax > kf_parallax_threshold / 2.0
-                and tracked_lm_ratio < kf_landmark_ratio
-            )
+            and avg_parallax > kf_parallax_threshold / 2.0
+            and tracked_lm_ratio < kf_landmark_ratio
         ):
             n_ret, frame = detector(
                 frame,

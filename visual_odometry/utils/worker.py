@@ -72,11 +72,13 @@ def create_worker(
         queue.put(args)
         return lambda: queue.join() if not thread_context.is_closed else None
 
+    sentinel = None
+
     def worker_loop(queue):
         one_shot()
         for args in queue_iter(
             partial(queue.get, timeout=timeout),
-            None,
+            sentinel,
         ):
             with thread_context.__close_cond__:
                 if thread_context.is_closed:
@@ -98,7 +100,7 @@ def create_worker(
         thread,
         partial(
             queue.put,
-            None,
+            sentinel,
         ),
     )
     return register_task
